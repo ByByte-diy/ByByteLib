@@ -1,0 +1,21 @@
+{
+  "name": "ByByteLib",
+  "version": "0.1.0",
+  "description": "Cross-platform robotics control API for Arduino-compatible boards.",
+  "keywords": ["robotics", "motor", "kinematics", "sensors", "arduino"],
+  "authors": [
+    {
+      "name": "ByByte Team",
+      "email": "vergilium2@gmail.com"
+    }
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/ByByte-diy/ByByteLib",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ByByte-diy/ByByteLib.git"
+  },
+  "frameworks": ["arduino"],
+  "platforms": ["*"]
+}
+
