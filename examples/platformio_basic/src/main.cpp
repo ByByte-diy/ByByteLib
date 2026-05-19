@@ -1,32 +1,34 @@
 /*
  * ByByteLib - PlatformIO Basic Example
  *
- * Purpose:
- * - Minimal sketch to verify build and basic motor control on PlatformIO
- * - Uses direct control with setMotorSpeeds and delays
+ * Minimal sketch: ByByteNano kit bundles MotorDriver with DRV8833 defaults
+ * from configs when building for Nano (see platformio.ini board).
  *
- * Works on:
- * - Arduino Nano and Mega (auto-detected driver/pins)
+ * Swap to ByByteMega for Mega builds (TB6612 defaults).
  */
 #include <Arduino.h>
 #include <ByByteLib.h>
+#include <HardwareSerial.h>
 
 using namespace ByByte;
 
-MotorDriver motor;
+ByByteNano platform;
 
 void setup() {
-	motor.begin();
+	Serial.begin(9600);
+	Serial1.begin(115200);
+	pinMode(29, OUTPUT);
+	digitalWrite(29, HIGH);
+	Serial.println("Starting...");
+	platform.beginMotors();
+	// platform.beginBluetooth();
 }
 
 void loop() {
-	// Forward
-	motor.setMotorSpeeds(80, 80);
-	delay(1000);
-	// Turn
-	motor.setMotorSpeeds(-100, 100);
-	delay(800);
-	// Stop
-	motor.stop();
-	delay(500);
+	while (Serial1.available()) {
+		Serial.write(Serial1.read());
+	}
+	while (Serial.available()) {
+		Serial1.write(Serial.read());
+	}
 }

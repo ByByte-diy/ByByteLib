@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include "TimerManager.h"
-#include "PlatformDetect.h"
+#include "configs/PlatformDetect.h"
 #include "PcintManager.h"
 
 namespace ByByte {
@@ -35,7 +35,7 @@ public:
 		TimerManager::getInstance().unsubscribe(&Sonar::onTickStatic);
 		#elif BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_NANO
 		TimerManager::getInstance().unsubscribe(&Sonar::onTickStatic);
-		PcintManager::unsubscribe(_echo, &Sonar::onPcintStatic);
+		PcintManager::unsubscribe(_echo);
 		#endif
 	}
 

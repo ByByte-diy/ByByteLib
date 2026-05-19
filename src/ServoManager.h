@@ -2,7 +2,7 @@
 #define BYBYTE_SERVO_MANAGER_H
 
 #include <Arduino.h>
-#include "PlatformDetect.h"
+#include "configs/PlatformDetect.h"
 
 #if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
 

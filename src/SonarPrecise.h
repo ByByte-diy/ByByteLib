@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include "TimerManager.h"
-#include "PlatformDetect.h"
+#include "configs/PlatformDetect.h"
 
 namespace ByByte {
 

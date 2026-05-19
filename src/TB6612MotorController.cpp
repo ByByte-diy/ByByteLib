@@ -1,6 +1,5 @@
 #include "TB6612MotorController.h"
 #include "MotorUtils.h"
-#include "ByByteConfig.h"
 
 namespace ByByte {
 

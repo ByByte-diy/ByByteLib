@@ -17,7 +17,7 @@
 using namespace ByByte;
 
 IrReceiver ir(IrProtocol::Auto);
-MotorDriver motor; // auto platform/mode
+MotorDriver motor(MotorDriver::driverForBuildTarget()); // DRV8833 on Nano / TB6612 on Mega
 
 // Common NEC key codes on cheap remotes (adjust if needed)
 // These are typical values; print received frames to learn your remote

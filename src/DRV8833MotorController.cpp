@@ -1,6 +1,5 @@
 #include "DRV8833MotorController.h"
 #include "MotorUtils.h"
-#include "ByByteConfig.h"
 
 namespace ByByte {
 

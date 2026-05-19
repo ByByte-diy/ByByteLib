@@ -2,7 +2,7 @@
 #define BYBYTE_BATTERY_SENSOR_H
 
 #include <Arduino.h>
-#include "ByByteConfig.h"
+#include "configs/ByByteConfig.h"
 
 namespace ByByte {
 

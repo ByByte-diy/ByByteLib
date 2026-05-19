@@ -2,7 +2,7 @@
 #define BYBYTE_SERVO_H
 
 #include <Arduino.h>
-#include "PlatformDetect.h"
+#include "configs/PlatformDetect.h"
 
 namespace ByByte {
 

@@ -6,7 +6,7 @@
  * - forward/backward/turnLeft/turnRight/stop with fixed speeds and delays
  *
  * Works on:
- * - Arduino Nano and Mega (pins auto-detected from ByByteConfig)
+ * - Arduino Nano and Mega (pins auto-detected from configs/ByByteConfig)
  *
  * Usage:
  * - Upload and observe the robot perform a simple movement routine
@@ -15,7 +15,7 @@
 
 using namespace ByByte;
 
-MotorDriver motor;
+MotorDriver motor(MotorDriver::driverForBuildTarget());
 
 void setup() {
 	motor.begin();

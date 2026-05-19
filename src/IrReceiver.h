@@ -2,7 +2,7 @@
 #define BYBYTE_IR_RECEIVER_H
 
 #include <Arduino.h>
-#include "ByByteConfig.h"
+#include "configs/ByByteConfig.h"
 #include "PcintManager.h"
 
 namespace ByByte {

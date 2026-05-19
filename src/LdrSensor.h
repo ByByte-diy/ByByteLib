@@ -2,7 +2,7 @@
 #define BYBYTE_LDR_SENSOR_H
 
 #include <Arduino.h>
-#include "ByByteConfig.h"
+#include "configs/ByByteConfig.h"
 
 namespace ByByte {
 
@@ -22,14 +22,16 @@ public:
 	}
 	void calibrateStep() {
 		uint16_t v = readRaw();
-		if (v < _min) _min = v; if (v > _max) _max = v;
+		if (v < _min) _min = v;
+		if (v > _max) _max = v;
 	}
 	uint16_t readNormalized() {
 		uint16_t v = readRaw();
 		if (_max <= _min) return 0;
 		long span = (long)_max - (long)_min; if (span < 5) span = 5;
 		long num = _invert ? ((long)_max - (long)v) : ((long)v - (long)_min);
-		if (num < 0) num = 0; if (num > span) num = span;
+		if (num < 0) num = 0;
+		if (num > span) num = span;
 		return (uint16_t)((num * 1000L) / span);
 	}
 private:

@@ -15,5 +15,14 @@
 	#define BYBYTE_PLATFORM_ID BYBYTE_PLATFORM_UNKNOWN
 #endif
 
+#ifdef __cplusplus
+#include <stdint.h>
+namespace ByByte {
+inline uint8_t hardwarePlatformChip() noexcept {
+	return static_cast<uint8_t>(BYBYTE_PLATFORM_ID);
+}
+} // namespace ByByte
+#endif
+
 #endif // BYBYTE_PLATFORM_DETECT_H
 

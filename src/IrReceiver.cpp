@@ -103,20 +103,20 @@ void IrReceiver::handleNec(uint32_t dur) {
 
 // RC-5: Manchester-coded, bit time ~1778us, half-bit ~889us, 14 bits starting with two start bits '1'
 void IrReceiver::handleRc5(uint32_t dur, bool level) {
-	const uint32_t HALF = 889; const uint32_t TOL = 400; // допуск
-	// Відслідковуємо переходи та накопичуємо півбіти
+	const uint32_t HALF = 889; const uint32_t TOL = 400; // tolerance band
+	// Track edges and accumulate half-bit periods
 	static uint8_t halfs = 0;
-	static uint8_t curBit = 1; // RC5 починає зі '1'
+	static uint8_t curBit = 1; // RC5 starts at '1'
 	static bool last = _lastLevel;
 	_lastLevel = level;
-	if (dur < (HALF - TOL) || dur > (HALF + TOL)) return; // приблизно півбіта
-	// Кожен півбіт: чергуються рівні, формуємо біти на кожному другому півбіті
+	if (dur < (HALF - TOL) || dur > (HALF + TOL)) return; // not a half-bit
+	// Alternate levels each half-bit; latch bits every other half-bit
 	halfs++;
 	if (halfs & 1) {
-		// Перша половина біт-інтервалу: визначає значення біта по напрямку переходу
-		curBit = last ? 0 : 1; // перехід high->low дає 0, low->high дає 1
+		// First half of the bit interval: bit value from transition direction
+		curBit = last ? 0 : 1; // high->low = 0, low->high = 1
 	} else {
-		// Друга половина: фіксуємо біт
+		// Second half: commit bit into shift register
 		if (!_manInFrame) { _manInFrame = true; _manBitIndex = 0; _manRaw = 0; }
 		_manRaw = (_manRaw << 1) | (curBit & 1);
 		_manBitIndex++;
@@ -132,9 +132,9 @@ void IrReceiver::handleRc5(uint32_t dur, bool level) {
 	}
 }
 
-// RC-6 (Mode 0): Manchester, leader 2.667ms, 20 bits typical; спрощене декодування схоже до RC5
+// RC-6 (Mode 0): Manchester, leader 2.667ms, ~20 bits; simplified decode akin to RC-5 path
 void IrReceiver::handleRc6(uint32_t dur, bool level) {
-	const uint32_t HALF = 444; const uint32_t TOL = 250; // 1/4 від 1.778ms
+	const uint32_t HALF = 444; const uint32_t TOL = 250; // quarter of 1.778ms period
 	static uint8_t halfs = 0; static uint8_t curBit = 1; static bool last = _lastLevel;
 	_lastLevel = level;
 	if (dur < (HALF - TOL) || dur > (HALF + TOL)) return;
@@ -146,7 +146,7 @@ void IrReceiver::handleRc6(uint32_t dur, bool level) {
 		_manBitIndex++;
 		if (_manBitIndex >= 20) {
 			uint32_t d = _manRaw & 0xFFFFF;
-			uint8_t addr = (d >> 12) & 0xFF; // приблизно
+			uint8_t addr = (d >> 12) & 0xFF; // approximate
 			uint8_t cmd = d & 0x7F;
 			_frame.address = addr; _frame.command = cmd; _frame.repeat = false; _frame.proto = IrProtocol::RC6; _hasFrame = true;
 			_manInFrame=false; _manBitIndex=0; _manRaw=0; halfs=0;

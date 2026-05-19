@@ -2,7 +2,7 @@
 #define BYBYTE_SIDE_IR_SENSORS_H
 
 #include <Arduino.h>
-#include "ByByteConfig.h"
+#include "configs/ByByteConfig.h"
 
 namespace ByByte {
 
@@ -37,8 +37,10 @@ public:
 	// Updates calibration ranges using current sample
 	void calibrateStep() {
 		uint16_t l, r; sample(l, r);
-		if (l < _leftMin) _leftMin = l; if (l > _leftMax) _leftMax = l;
-		if (r < _rightMin) _rightMin = r; if (r > _rightMax) _rightMax = r;
+		if (l < _leftMin) _leftMin = l;
+		if (l > _leftMax) _leftMax = l;
+		if (r < _rightMin) _rightMin = r;
+		if (r > _rightMax) _rightMax = r;
 	}
 
 	// Auto-calibration loop: user can call in setup while moving robot
@@ -70,9 +72,12 @@ private:
 		// Guard against too small span causing numeric flip
 		if (span < 5) span = 5;
 		long num = invert ? ((long)vmax - (long)v) : ((long)v - (long)vmin);
-		if (num < 0) num = 0; if (num > span) num = span;
+		if (num < 0) num = 0;
+		if (num > span) num = span;
 		long res = (num * 1000L) / span;
-		if (res < 0) res = 0; if (res > 1000) res = 1000; return (uint16_t)res;
+		if (res < 0) res = 0;
+		if (res > 1000) res = 1000;
+		return (uint16_t)res;
 	}
 
 	uint8_t _powerPin;

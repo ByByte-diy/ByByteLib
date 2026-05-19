@@ -15,7 +15,7 @@
 
 using namespace ByByte;
 
-MotorDriver motor;
+MotorDriver motor(MotorDriver::driverForBuildTarget());
 
 void setup() {
 	motor.begin();

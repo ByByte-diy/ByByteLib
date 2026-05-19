@@ -7,14 +7,14 @@
  *
  * Hardware:
  * - Nano: 5 digital line sensors (A0..A4 via Schmitt triggers)
- * - Pins auto-detected from ByByteConfig
+ * - Pins auto-detected from configs/ByByteConfig
  */
 #include <ByByteLib.h>
 #include <QTRSensors.h>
 
 using namespace ByByte;
 
-MotorDriver motor(DriverType::Auto, {}, ControlMode::Differential);
+MotorDriver motor(MotorDriver::driverForBuildTarget(), {}, ControlMode::Differential);
 QTRSensors qtr;
 
 static const uint8_t qtrPins[] = { BYBYTE_LINE_PIN_0, BYBYTE_LINE_PIN_1, BYBYTE_LINE_PIN_2,

@@ -1,5 +1,5 @@
 #include "ServoManager.h"
-#include "ByByteConfig.h"
+#include "configs/ByByteConfig.h"
 
 #if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
 #include <avr/io.h>

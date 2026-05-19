@@ -1,81 +1,149 @@
+// Real SoftwareSerial only in this TU; Bluetooth.h keeps a pointer + forward declare for IntelliSense/clang without Arduino lib paths.
+#include <Arduino.h>
+#include <SoftwareSerial.h>
 #include "Bluetooth.h"
 
 namespace ByByte {
 
-// Include all commonly used baud rates for HC-0x family
+// Bauds to try when hunting for AT mode (HC-0x family typical values)
 static const uint32_t kProbeBauds[] = { 9600, 38400, 19200, 57600, 115200, 4800, 2400, 1200 };
 
-// Forward declaration for the local helper
-static bool atTrySequence(Stream& s, const __FlashStringHelper* cmdF, const char* cmdC, const char* expect, String* out = nullptr, uint16_t timeoutMs = 500);
+static bool atTrySequence(Stream& s, const __FlashStringHelper* cmdF, const char* cmdC, const char* expect,
+                          String* out = nullptr, uint16_t timeoutMs = 500);
 
-Bluetooth::Bluetooth()
 #if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
-    : _serial(&BYBYTE_BT_UART), _baud(0), _type(BtModuleType::Unknown), _isReady(false), _isChecking(false), _checkAttempts(0), _lastCheckTime(0) {}
+Bluetooth::Bluetooth(HardwareSerial& uart, bb::pins::by_byte_mega::BtMegaBluetoothPins layout)
+    : _serial(&uart), _powerPin(layout.powerPin), _baud(0), _type(BtModuleType::Unknown), _isReady(false),
+      _isChecking(false), _checkAttempts(0), _lastCheckTime(0) {}
 #else
-    : _serial(nullptr), _baud(0), _type(BtModuleType::Unknown), _isReady(false), _isChecking(false), _checkAttempts(0), _lastCheckTime(0) {}
+Bluetooth::Bluetooth(bb::pins::by_byte_nano::BtSoftwareSerialPins pins)
+    : _pins(pins), _uart(new SoftwareSerial(pins.rx, pins.tx)), _baud(0), _type(BtModuleType::Unknown),
+      _isReady(false), _isChecking(false), _checkAttempts(0), _lastCheckTime(0) {}
 #endif
+
+Bluetooth::~Bluetooth() {
+#if BYBYTE_PLATFORM_ID != BYBYTE_PLATFORM_MEGA
+	// Arduino SoftwareSerial has no virtual destructor; delete is well-defined for this concrete type.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdelete-non-virtual-dtor"
+	delete _uart;
+#pragma GCC diagnostic pop
+#endif
+}
+
+void Bluetooth::closeUart() {
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	_serial->end();
+#else
+	_uart->end();
+#endif
+}
+
+void Bluetooth::openUart(uint32_t baud) {
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	_serial->begin(baud);
+#else
+	_uart->begin(static_cast<long>(baud));
+#endif
+}
 
 bool Bluetooth::begin(uint32_t desiredBaud) {
 #if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
-    // Power on control pin (if defined)
-    pinMode(BYBYTE_BT_PWR_PIN, OUTPUT);
-    digitalWrite(BYBYTE_BT_PWR_PIN, HIGH); // assume HIGH=ON by default
-    Serial.print(F("BT power pin D")); Serial.print(BYBYTE_BT_PWR_PIN); Serial.println(F(" = HIGH"));
-    // Initialize UART at desired baud so we can start communicating immediately
-    _serial->end();
-    _serial->begin(desiredBaud);
+	pinMode(_powerPin, OUTPUT);
+	digitalWrite(_powerPin, HIGH); // board default: HIGH powers the module
+	delay(300); // allow regulator + module boot before first AT (avoids false "init FAILED")
+	Serial.print(F("BT power pin D"));
+	Serial.print(_powerPin);
+	Serial.println(F(" = HIGH"));
 #else
-    // Create SoftwareSerial on Nano
-    if (_serial == nullptr) {
-        _serial = new SoftwareSerial(BYBYTE_BT_SW_RX_PIN, BYBYTE_BT_SW_TX_PIN);
-    }
-    Serial.print(F("BT SoftwareSerial RX=")); Serial.print(BYBYTE_BT_SW_RX_PIN); 
-    Serial.print(F(" TX=")); Serial.println(BYBYTE_BT_SW_TX_PIN);
-    _serial->end();
-    _serial->begin(desiredBaud);
+	Serial.print(F("BT SoftwareSerial RX="));
+	Serial.print(_pins.rx);
+	Serial.print(F(" TX="));
+	Serial.println(_pins.tx);
 #endif
-    _baud = desiredBaud;
-    // Start asynchronous readiness check
-    startReadinessCheck();
-    return true; // Return immediately, check isReady() later
+	closeUart();
+	openUart(desiredBaud);
+	_baud = desiredBaud;
+	startReadinessCheck();
+	return true;
 }
 
 // beginPassive removed as per design: begin() handles stabilization and probing
 
-int Bluetooth::available() { 
-    if (!_serial) return 0;
-    // If any incoming data present, consider link active and stop probing
-    int n = _serial->available();
-    if (n > 0) { _isReady = true; _isChecking = false; return n; }
-    // Otherwise, perform a non-intrusive readiness check
-    isReady();
-    return 0; 
+int Bluetooth::available() {
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	if (!_serial) return 0;
+	int n = _serial->available();
+#else
+	if (!_uart) return 0;
+	int n = _uart->available();
+#endif
+	if (n > 0) {
+		_isReady = true;
+		_isChecking = false;
+		return n;
+	}
+	isReady();
+	return 0;
 }
 
-int Bluetooth::read() { return _serial ? _serial->read() : -1; }
-size_t Bluetooth::readBytes(uint8_t* buffer, size_t length) { return _serial ? _serial->readBytes((char*)buffer, length) : 0; }
-size_t Bluetooth::write(uint8_t b) { return _serial ? _serial->write(b) : 0; }
-size_t Bluetooth::write(const uint8_t* data, size_t length) { return _serial ? _serial->write(data, length) : 0; }
-void Bluetooth::flush() { if (_serial) _serial->flush(); }
+int Bluetooth::read() {
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	return _serial ? _serial->read() : -1;
+#else
+	return _uart ? _uart->read() : -1;
+#endif
+}
+
+size_t Bluetooth::readBytes(uint8_t* buffer, size_t length) {
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	return _serial ? _serial->readBytes((char*)buffer, length) : 0;
+#else
+	return _uart ? _uart->readBytes((char*)buffer, length) : 0;
+#endif
+}
+
+size_t Bluetooth::write(uint8_t b) {
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	return _serial ? _serial->write(b) : 0;
+#else
+	return _uart ? _uart->write(b) : 0;
+#endif
+}
+
+size_t Bluetooth::write(const uint8_t* data, size_t length) {
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	return _serial ? _serial->write(data, length) : 0;
+#else
+	return _uart ? _uart->write(data, length) : 0;
+#endif
+}
+
+void Bluetooth::flush() {
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	if (_serial) _serial->flush();
+#else
+	if (_uart) _uart->flush();
+#endif
+}
 
 void Bluetooth::powerOn() {
 #if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
-    pinMode(BYBYTE_BT_PWR_PIN, OUTPUT);
-    digitalWrite(BYBYTE_BT_PWR_PIN, HIGH);
+	pinMode(_powerPin, OUTPUT);
+	digitalWrite(_powerPin, HIGH);
 #endif
 }
 
 void Bluetooth::powerOff() {
 #if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
-    pinMode(BYBYTE_BT_PWR_PIN, OUTPUT);
-    digitalWrite(BYBYTE_BT_PWR_PIN, LOW);
+	pinMode(_powerPin, OUTPUT);
+	digitalWrite(_powerPin, LOW);
 #endif
 }
 
 bool Bluetooth::rename(const char* newName) {
-    // AT+NAME for HC-05/06/42, AT+NAME? for query
-    String dummy;
-    char cmd[32]; snprintf(cmd, sizeof(cmd), "AT+NAME%s", newName);
+	char cmd[32];
+	snprintf(cmd, sizeof(cmd), "AT+NAME%s", newName);
     return sendAT(cmd, "OK");
 }
 
@@ -124,10 +192,13 @@ bool Bluetooth::isReady() {
 }
 
 bool Bluetooth::ping(uint16_t timeoutMs) {
-    if (!_serial) return false;
-    // Try both without and with CRLF
-    if (atTrySequence(*_serial, F("AT"), nullptr, "OK", nullptr, timeoutMs)) return true;
-    return false;
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	if (!_serial) return false;
+	return atTrySequence(*_serial, F("AT"), nullptr, "OK", nullptr, timeoutMs);
+#else
+	if (!_uart) return false;
+	return atTrySequence(*_uart, F("AT"), nullptr, "OK", nullptr, timeoutMs);
+#endif
 }
 
 bool Bluetooth::setPin(const char* pin4digits) {
@@ -157,7 +228,8 @@ bool Bluetooth::getBleName(String& outName) {
 static bool atTrySequence(Stream& s, const __FlashStringHelper* cmdF, const char* cmdC, const char* expect, String* out, uint16_t timeoutMs) {
     // Try without CRLF
     while (s.available()) s.read();
-    if (cmdF) s.print(cmdF); else s.print(cmdC);
+    if (cmdF) {s.println(cmdF);}
+    else {s.println(cmdC); }
     unsigned long t0 = millis();
     String resp;
     while (millis() - t0 < timeoutMs) {
@@ -165,40 +237,54 @@ static bool atTrySequence(Stream& s, const __FlashStringHelper* cmdF, const char
         if (resp.indexOf(expect) >= 0) { if (out) *out = resp; return true; }
         delay(5);
     }
+    Serial.println(F("AT try without CRLF failed"));
+    Serial.println(resp);
     // Try with CRLF
     while (s.available()) s.read();
-    if (cmdF) { s.print(cmdF); s.print("\r\n"); } else { s.print(cmdC); s.print("\r\n"); }
+    if (cmdF) { s.print(cmdF); s.print("\r\n"); } 
+    else { s.print(cmdC); s.print("\r\n"); }
     t0 = millis(); resp = String();
     while (millis() - t0 < timeoutMs) {
         while (s.available()) resp += (char)s.read();
         if (resp.indexOf(expect) >= 0) { if (out) *out = resp; return true; }
         delay(5);
     }
+    Serial.println(F("AT try with CRLF failed"));
+    Serial.println(resp);
     return false;
 }
 
 bool Bluetooth::enterAtMode(uint32_t& detectedBaud) {
-    // Try a set of bauds to find AT response
 #if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
-    for (uint8_t i=0;i<sizeof(kProbeBauds)/sizeof(kProbeBauds[0]);++i) {
-        _serial->end();
-        _serial->begin(kProbeBauds[i]);
-        delay(80);
-        if (atTrySequence(*_serial, F("AT"), nullptr, "OK", nullptr, 600)) { detectedBaud = kProbeBauds[i]; return true; }
-        // Some HC-02 reply only to VERSION queries
-        if (atTrySequence(*_serial, F("AT+VERSION?"), nullptr, "OK", nullptr, 600)) { detectedBaud = kProbeBauds[i]; return true; }
-    }
+	for (uint8_t i = 0; i < sizeof(kProbeBauds) / sizeof(kProbeBauds[0]); ++i) {
+		_serial->end();
+		_serial->begin(kProbeBauds[i]);
+		delay(80);
+		if (atTrySequence(*_serial, F("AT"), nullptr, "OK", nullptr, 600)) {
+			detectedBaud = kProbeBauds[i];
+			return true;
+		}
+		if (atTrySequence(*_serial, F("AT+VERSION?"), nullptr, "OK", nullptr, 600)) {
+			detectedBaud = kProbeBauds[i];
+			return true;
+		}
+	}
 #else
-    if (_serial == nullptr) return false;
-    for (uint8_t i=0;i<sizeof(kProbeBauds)/sizeof(kProbeBauds[0]);++i) {
-        _serial->end();
-        _serial->begin(kProbeBauds[i]);
-        delay(80);
-        if (atTrySequence(*_serial, F("AT"), nullptr, "OK", nullptr, 600)) { detectedBaud = kProbeBauds[i]; return true; }
-        if (atTrySequence(*_serial, F("AT+VERSION?"), nullptr, "OK", nullptr, 600)) { detectedBaud = kProbeBauds[i]; return true; }
-    }
+	for (uint8_t i = 0; i < sizeof(kProbeBauds) / sizeof(kProbeBauds[0]); ++i) {
+		_uart->end();
+		_uart->begin(static_cast<long>(kProbeBauds[i]));
+		delay(80);
+		if (atTrySequence(*_uart, F("AT"), nullptr, "OK", nullptr, 600)) {
+			detectedBaud = kProbeBauds[i];
+			return true;
+		}
+		if (atTrySequence(*_uart, F("AT+VERSION?"), nullptr, "OK", nullptr, 600)) {
+			detectedBaud = kProbeBauds[i];
+			return true;
+		}
+	}
 #endif
-    return false;
+	return false;
 }
 
 bool Bluetooth::detectModuleType() {
@@ -237,47 +323,53 @@ bool Bluetooth::setModuleBaud(uint32_t newBaud) {
 }
 
 bool Bluetooth::sendAT(const __FlashStringHelper* cmd, const char* expectOk, String* out, uint16_t timeoutMs) {
-    if (!_serial) return false;
-    while (_serial->available()) _serial->read();
-    _serial->print(cmd);
-    _serial->print("\r\n");
-    unsigned long t0 = millis();
-    String resp;
-    while (millis() - t0 < timeoutMs) {
-        while (_serial->available()) {
-            char c = (char)_serial->read();
-            resp += c;
-        }
-        if (resp.indexOf(expectOk) >= 0) {
-            if (out) *out = resp;
-            return true;
-        }
-        delay(5);
-    }
-    if (out) *out = resp;
-    return false;
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	if (!_serial) return false;
+	auto* rx = _serial;
+#else
+	if (!_uart) return false;
+	auto* rx = _uart;
+#endif
+	while (rx->available()) rx->read();
+	rx->print(cmd);
+	rx->print("\r\n");
+	unsigned long t0 = millis();
+	String resp;
+	while (millis() - t0 < timeoutMs) {
+		while (rx->available()) resp += (char)rx->read();
+		if (resp.indexOf(expectOk) >= 0) {
+			if (out) *out = resp;
+			return true;
+		}
+		delay(5);
+	}
+	if (out) *out = resp;
+	return false;
 }
 
 bool Bluetooth::sendAT(const char* cmd, const char* expectOk, String* out, uint16_t timeoutMs) {
-    if (!_serial) return false;
-    while (_serial->available()) _serial->read();
-    _serial->print(cmd);
-    _serial->print("\r\n");
-    unsigned long t0 = millis();
-    String resp;
-    while (millis() - t0 < timeoutMs) {
-        while (_serial->available()) {
-            char c = (char)_serial->read();
-            resp += c;
-        }
-        if (resp.indexOf(expectOk) >= 0) {
-            if (out) *out = resp;
-            return true;
-        }
-        delay(5);
-    }
-    if (out) *out = resp;
-    return false;
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	if (!_serial) return false;
+	auto* rx = _serial;
+#else
+	if (!_uart) return false;
+	auto* rx = _uart;
+#endif
+	while (rx->available()) rx->read();
+	rx->print(cmd);
+	rx->print("\r\n");
+	unsigned long t0 = millis();
+	String resp;
+	while (millis() - t0 < timeoutMs) {
+		while (rx->available()) resp += (char)rx->read();
+		if (resp.indexOf(expectOk) >= 0) {
+			if (out) *out = resp;
+			return true;
+		}
+		delay(5);
+	}
+	if (out) *out = resp;
+	return false;
 }
 
 bool Bluetooth::queryFirstMatch(const char* const* cmds, size_t n, const char* expectOk, String* out, uint16_t timeoutMs) {

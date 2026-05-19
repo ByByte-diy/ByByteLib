@@ -3,12 +3,14 @@
 
 #include <Arduino.h>
 #include "Types.h"
-#include "ByByteConfig.h"
+#include "configs/ByByteConfig.h"
 #include "MotorController.h"
 #include "DifferentialDriveController.h"
-#include "PlatformDetect.h"
+#include "configs/PlatformDetect.h"
+#include "configs/ByByteProduct.h"
 #include "PcintManager.h"
 #include "MotorDriver.h"
+#include "ByByteKits.h"
 #include "SideIrSensors.h"
 #include "IrReceiver.h"
 #include "Servo.h"

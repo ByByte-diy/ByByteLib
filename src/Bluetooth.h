@@ -2,81 +2,107 @@
 #define BYBYTE_BLUETOOTH_H
 
 #include <Arduino.h>
-#include "ByByteConfig.h"
+#include "configs/ByByteConfig.h"
 
-#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_NANO
-#include <SoftwareSerial.h>
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+#include "configs/BbPinsByByteMega.h"
+#else
+#include "configs/BbPinsByByteNano.h"
+// Pointer member only; full type in Bluetooth.cpp so headers stay parseable without Arduino library paths.
+class SoftwareSerial;
 #endif
 
 namespace ByByte {
 
 enum class BtModuleType { Unknown, HC02, HC05, HC06, HC08_BLE, HC42_BLE };
 
+/**
+ * Platform Bluetooth bridge: Mega uses BYBYTE_BT_UART + optional power pin;
+ * other boards use SoftwareSerial on the pins from bb::pins / ByByteConfig.
+ */
 class Bluetooth {
 public:
-    Bluetooth();
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	Bluetooth(HardwareSerial& uart = BYBYTE_BT_UART,
+	          bb::pins::by_byte_mega::BtMegaBluetoothPins layout = bb::pins::by_byte_mega::defaultBluetoothMega());
+#else
+	explicit Bluetooth(bb::pins::by_byte_nano::BtSoftwareSerialPins pins =
+	                       bb::pins::by_byte_nano::defaultBluetoothSoftwareSerialPins());
+#endif
 
-    // Initialize module; automatically detects default baud and configures desired baud
-    // Returns true on success
-    bool begin(uint32_t desiredBaud = 9600);
+	~Bluetooth();
 
-    // Asynchronous readiness check (non-blocking)
-    void startReadinessCheck();
-    bool isReady(); // Checks time, pings module, updates flag
-    bool isChecking() const { return _isChecking; }
+	Bluetooth(const Bluetooth&) = delete;
+	Bluetooth& operator=(const Bluetooth&) = delete;
 
-    // Basic stream-like API
-    int available();
-    int read();
-    size_t readBytes(uint8_t* buffer, size_t length);
-    size_t write(uint8_t b);
-    size_t write(const uint8_t* data, size_t length);
-    void flush();
+	// Start UART/SoftwareSerial at desiredBaud, apply power on Mega. Returns immediately; poll isReady().
+	bool begin(uint32_t desiredBaud = 9600);
 
-    // Power control (Mega only). On Nano these are no-ops.
-    void powerOn();
-    void powerOff();
+	void startReadinessCheck();
+	bool isReady(); // Non-blocking; may ping when checking
+	bool isChecking() const { return _isChecking; }
 
-    // AT helpers (return true on success)
-    bool rename(const char* newName);
-    bool getName(String& outName);
-    bool reset();
-    bool setPin(const char* pin4digits);
-    bool restoreDefault();
+	// Stream-like API over the module link
+	int available();
+	int read();
+	size_t readBytes(uint8_t* buffer, size_t length);
+	size_t write(uint8_t b);
+	size_t write(const uint8_t* data, size_t length);
+	void flush();
 
-    // BLE specific (best-effort; no-op on classic modules)
-    bool setBleName(const char* newName);
-    bool getBleName(String& outName);
+	// Mega: toggles Bluetooth supply via power pin. Nano/others: no-op.
+	void powerOn();
+	void powerOff();
 
-    // Diagnostics: send simple AT and expect OK
-    bool ping(uint16_t timeoutMs = 500);
+	// Classic module AT commands; return true when response contains expect string / OK
+	bool rename(const char* newName);
+	bool getName(String& outName);
+	bool reset();
+	bool setPin(const char* pin4digits);
+	bool restoreDefault();
 
-    BtModuleType moduleType() const { return _type; }
-    uint32_t baud() const { return _baud; }
+	// BLE modules (best-effort; often same AT+NAME path as classic)
+	bool setBleName(const char* newName);
+	bool getBleName(String& outName);
+
+	// Send AT and look for OK within timeoutMs
+	bool ping(uint16_t timeoutMs = 500);
+
+	BtModuleType moduleType() const { return _type; }
+	uint32_t baud() const { return _baud; }
 
 private:
 #if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
-    HardwareSerial* _serial;
+	HardwareSerial* _serial;
+	uint8_t _powerPin;
 #else
-    SoftwareSerial* _serial;
+	bb::pins::by_byte_nano::BtSoftwareSerialPins _pins;
+	SoftwareSerial* _uart; // heap-allocated in ctor; see ~Bluetooth() in .cpp
 #endif
-    uint32_t _baud;
-    BtModuleType _type;
-    bool _isReady;
-    bool _isChecking;
-    uint8_t _checkAttempts;
-    unsigned long _lastCheckTime;
+	uint32_t _baud;
+	BtModuleType _type;
+	bool _isReady;
+	bool _isChecking;
+	uint8_t _checkAttempts;
+	unsigned long _lastCheckTime;
+	/** After one failed ping, try common bauds once (see probeAtAcrossCommonBauds). */
+	bool _baudProbeDone;
 
-    bool enterAtMode(uint32_t& detectedBaud);
-    bool detectModuleType();
-    bool setModuleBaud(uint32_t newBaud);
-    bool sendAT(const __FlashStringHelper* cmd, const char* expectOk, String* out = nullptr, uint16_t timeoutMs = 500);
-    bool sendAT(const char* cmd, const char* expectOk, String* out = nullptr, uint16_t timeoutMs = 500);
-    bool queryFirstMatch(const char* const* cmds, size_t n, const char* expectOk, String* out = nullptr, uint16_t timeoutMs = 500);
+	void closeUart();
+	void openUart(uint32_t baud);
+
+	/** Quick scan of common UART rates if default ping fails (still same line rate for HC-0x data/AT). */
+	bool probeAtAcrossCommonBauds(uint16_t replyTimeoutMs);
+
+	bool enterAtMode(uint32_t& detectedBaud);
+	bool detectModuleType();
+	bool setModuleBaud(uint32_t newBaud);
+	bool sendAT(const __FlashStringHelper* cmd, const char* expectOk, String* out = nullptr, uint16_t timeoutMs = 500);
+	bool sendAT(const char* cmd, const char* expectOk, String* out = nullptr, uint16_t timeoutMs = 500);
+	bool queryFirstMatch(const char* const* cmds, size_t n, const char* expectOk, String* out = nullptr,
+	                     uint16_t timeoutMs = 500);
 };
 
 } // namespace ByByte
 
 #endif // BYBYTE_BLUETOOTH_H
-
-

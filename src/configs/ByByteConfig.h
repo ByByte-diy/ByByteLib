@@ -281,6 +281,13 @@
 	#ifndef BYBYTE_LINE_IS_DIGITAL
 	#define BYBYTE_LINE_IS_DIGITAL 0
 	#endif
+	// Bluetooth (fallback): generic SoftwareSerial pins if not overridden
+	#ifndef BYBYTE_BT_SW_RX_PIN
+	#define BYBYTE_BT_SW_RX_PIN 2
+	#endif
+	#ifndef BYBYTE_BT_SW_TX_PIN
+	#define BYBYTE_BT_SW_TX_PIN 3
+	#endif
 #endif
 
 #endif // BYBYTE_CONFIG_H

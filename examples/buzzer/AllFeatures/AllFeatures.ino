@@ -4,7 +4,7 @@
  * Shows: tone(), noTone(), and built-in patterns:
  *  - patternCarHorn(), patternSiren(), patternR2D2(), patternClick()
  *
- * Pins (from ByByteConfig.h):
+ * Pins (from src/configs/ByByteConfig.h):
  *  - Mega: D45 (OC5B)
  *  - Nano: D11 (OC2A)
  */

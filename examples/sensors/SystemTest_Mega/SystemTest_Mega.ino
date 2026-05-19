@@ -104,7 +104,7 @@ bool power12v = false;
 unsigned long powerToggleTime = 0;
 
 // Objects
-ByByte::MotorDriver motors;
+ByByte::MotorDriver motors(DriverType::TB6612);
 ByByte::Bluetooth bt;
 ByByte::Buzzer buzzer;
 ByByte::BatterySensor battery;
