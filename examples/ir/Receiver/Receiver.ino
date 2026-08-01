@@ -17,19 +17,19 @@
 using namespace ByByte;
 
 IrReceiver ir(IrProtocol::Auto);
-MotorDriver motor(MotorDriver::driverForBuildTarget()); // DRV8833 on Nano / TB6612 on Mega
+MotorDriver motor; // Auto-detected: DRV8833 on Nano / TB6612 on Mega
 
 // Common NEC key codes on cheap remotes (adjust if needed)
 // These are typical values; print received frames to learn your remote
-const uint8_t KEY_UP    = 0x18; // ▲
-const uint8_t KEY_DOWN  = 0x52; // ▼
-const uint8_t KEY_LEFT  = 0x08; // ◄
+const uint8_t KEY_UP = 0x18; // ▲
+const uint8_t KEY_DOWN = 0x52; // ▼
+const uint8_t KEY_LEFT = 0x08; // ◄
 const uint8_t KEY_RIGHT = 0x5A; // ►
-const uint8_t KEY_OK    = 0x1C; // OK/Enter
-const uint8_t KEY_STOP  = 0x16; // often labeled as '0' or STOP
+const uint8_t KEY_OK = 0x1C; // OK/Enter
+const uint8_t KEY_STOP = 0x16; // often labeled as '0' or STOP
 
 void setup() {
-	Serial.begin(115200);
+	Serial.begin(9600);
 	Serial.println(F("=== IR Receiver Demo ==="));
 	motor.begin();
 	ir.begin();
@@ -39,35 +39,35 @@ void setup() {
 void handleCommand(const IrFrame& f) {
 	// Basic control mapping
 	switch (f.command) {
-		case KEY_UP:
-			motor.forward(120);
-			Serial.println(F("CMD: FORWARD"));
-			break;
-		case KEY_DOWN:
-			motor.backward(120);
-			Serial.println(F("CMD: BACKWARD"));
-			break;
-		case KEY_LEFT:
-			motor.turnLeft(120);
-			Serial.println(F("CMD: TURN LEFT"));
-			break;
-		case KEY_RIGHT:
-			motor.turnRight(120);
-			Serial.println(F("CMD: TURN RIGHT"));
-			break;
-		case KEY_OK:
-			motor.setTargetVelocity(0, 0); // switch to differential idle
-			motor.stop();
-			Serial.println(F("CMD: OK / STOP"));
-			break;
-		case KEY_STOP:
-			motor.stop();
-			Serial.println(F("CMD: STOP"));
-			break;
-		default:
-			Serial.print(F("CMD: 0x")); Serial.print(f.command, HEX);
-			Serial.print(F(" proto=")); Serial.println((int)f.proto);
-			break;
+	case KEY_UP:
+		motor.forward(120);
+		Serial.println(F("CMD: FORWARD"));
+		break;
+	case KEY_DOWN:
+		motor.backward(120);
+		Serial.println(F("CMD: BACKWARD"));
+		break;
+	case KEY_LEFT:
+		motor.turnLeft(120);
+		Serial.println(F("CMD: TURN LEFT"));
+		break;
+	case KEY_RIGHT:
+		motor.turnRight(120);
+		Serial.println(F("CMD: TURN RIGHT"));
+		break;
+	case KEY_OK:
+		motor.setTargetVelocity(0, 0); // switch to differential idle
+		motor.stop();
+		Serial.println(F("CMD: OK / STOP"));
+		break;
+	case KEY_STOP:
+		motor.stop();
+		Serial.println(F("CMD: STOP"));
+		break;
+	default:
+		Serial.print(F("CMD: 0x")); Serial.print(f.command, HEX);
+		Serial.print(F(" proto=")); Serial.println((int)f.proto);
+		break;
 	}
 }
 

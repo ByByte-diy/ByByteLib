@@ -42,6 +42,8 @@ private:
     uint8_t _seqIdx;
     uint16_t _seqRepeat;
     uint32_t _seqNextMs;
+    bool _seqProgmem;   // true  -> _seqFreq/_seqDur live in PROGMEM (read via pgm_read_word)
+                        // false -> they live in RAM (e.g. _tmpFreq/_tmpDur)
 
     // Temporary buffers for custom patterns (small fixed capacity)
     uint16_t _tmpFreq[8];
@@ -49,7 +51,7 @@ private:
 
     void startPwm(uint16_t freqHz);
     void stopPwm();
-    void startSequence(const uint16_t* f, const uint16_t* d, uint8_t n, uint16_t repeat);
+    void startSequence(const uint16_t* f, const uint16_t* d, uint8_t n, uint16_t repeat, bool progmem);
 };
 
 } // namespace ByByte

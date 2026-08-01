@@ -40,8 +40,9 @@ struct MotorPins {
 
 class MotorDriver {
 public:
-	/** Matches ByByteConfig wiring: TB6612 on Mega, DRV8833 on Nano (and unknown → DRV8833). */
-	static DriverType driverForBuildTarget();
+	/** Driver auto-detected from build target: TB6612 on Mega, DRV8833 on Nano (and unknown → DRV8833). */
+	explicit MotorDriver(ControlMode mode = ControlMode::Direct);
+	MotorDriver(const MotorPins& pins, ControlMode mode = ControlMode::Direct);
 
 	explicit MotorDriver(DriverType driver, ControlMode mode = ControlMode::Direct);
 	MotorDriver(DriverType driver, const MotorPins& pins, ControlMode mode = ControlMode::Direct);

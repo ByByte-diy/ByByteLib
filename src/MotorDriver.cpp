@@ -7,13 +7,24 @@
 
 namespace ByByte {
 
-DriverType MotorDriver::driverForBuildTarget() {
+namespace {
+
+/** Matches ByByteConfig wiring: TB6612 on Mega, DRV8833 on Nano (and unknown → DRV8833). */
+DriverType defaultDriverForBuildTarget() {
 	#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
 	return DriverType::TB6612;
 	#else
 	return DriverType::DRV8833;
 	#endif
 }
+
+} // namespace
+
+MotorDriver::MotorDriver(ControlMode mode)
+	: MotorDriver(defaultDriverForBuildTarget(), mode) {}
+
+MotorDriver::MotorDriver(const MotorPins& pins, ControlMode mode)
+	: MotorDriver(defaultDriverForBuildTarget(), pins, mode) {}
 
 MotorDriver::MotorDriver(DriverType driver, ControlMode mode)
 	: _motor(nullptr),

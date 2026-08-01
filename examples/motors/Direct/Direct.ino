@@ -15,7 +15,7 @@
 
 using namespace ByByte;
 
-MotorDriver motor(MotorDriver::driverForBuildTarget());
+MotorDriver motor;
 
 void setup() {
 	motor.begin();
@@ -25,16 +25,16 @@ void loop() {
 	// Direct motor control
 	motor.setMotorSpeeds(80, 80);  // forward
 	delay(1000);
-	
+
 	motor.setMotorSpeeds(-100, 100);  // turn left
 	delay(800);
-	
+
 	motor.setMotorSpeeds(-80, -80);  // backward
 	delay(1000);
-	
+
 	motor.setMotorSpeeds(100, -100);  // turn right
 	delay(800);
-	
+
 	motor.stop();
 	delay(500);
 }

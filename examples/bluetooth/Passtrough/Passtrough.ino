@@ -1,5 +1,5 @@
 /*
- * ByByteLib - Bluetooth Basic (HC-02/05/06/08/42)
+ * ByByteLib - Bluetooth Passthrough (HC-02/05/06/08/42)
  *
  * Purpose:
  * - Initializes Bluetooth module, aligns baud rate, and echoes data
@@ -29,24 +29,14 @@ void loop() {
 	if (bt.isReady() && !showedReady) {
 		Serial.println(F("BT module ready!"));
 		Serial.print(F("Baud: ")); Serial.println(bt.baud());
-    	String name;
-    	if (bt.getName(name)) Serial.println(String(F("Name: ")) + name);
+		String name;
+		if (bt.getName(name)) Serial.println(String(F("Name: ")) + name);
 		showedReady = true;
 	}
-	
-	// PC -> BT passthrough and simple commands
+
+	// PC -> BT passthrough
 	if (Serial.available()) {
 		char c = (char)Serial.read();
-		if (c == 'r') {
-			Serial.println(F("AT: reset"));
-			bt.reset();
-			showedReady = false; // Reset status display
-			return;
-    		} else if (c == 'n') {
-			Serial.println(F("AT: rename to ByByteBot"));
-			bt.rename("ByByteBot");
-			return;
-		}
 		bt.write((uint8_t)c);
 	}
 	// BT -> PC

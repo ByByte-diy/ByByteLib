@@ -14,7 +14,7 @@
 
 using namespace ByByte;
 
-MotorDriver motor(MotorDriver::driverForBuildTarget(), {}, ControlMode::Differential);
+MotorDriver motor(ControlMode::Differential);
 QTRSensors qtr;
 
 static const uint8_t qtrPins[] = { BYBYTE_LINE_PIN_0, BYBYTE_LINE_PIN_1, BYBYTE_LINE_PIN_2,

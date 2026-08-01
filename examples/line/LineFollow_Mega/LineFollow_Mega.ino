@@ -18,7 +18,7 @@
 
 using namespace ByByte;
 
-MotorDriver motor(MotorDriver::driverForBuildTarget(), {}, ControlMode::Differential);
+MotorDriver motor(ControlMode::Differential);
 QTRSensors qtr;
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
