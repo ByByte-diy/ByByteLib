@@ -2,17 +2,14 @@
 #define BYBYTE_LIB_H
 
 #include <Arduino.h>
-#include "Types.h"
-#include "configs/ByByteConfig.h"
-#include "MotorController.h"
-#include "DifferentialDriveController.h"
-#include "configs/PlatformDetect.h"
-#include "configs/ByByteProduct.h"
-#include "PcintManager.h"
+#include "core/Types.h"
+#include "core/configs/ByByteConfig.h"
+#include "core/configs/PlatformDetect.h"
+#include "core/configs/ByByteProduct.h"
+#include "core/PcintManager.h"
 #include "MotorDriver.h"
 #include "ByByteKits.h"
 #include "SideIrSensors.h"
-#include "IrReceiver.h"
 #include "Servo.h"
 #include "ServoManager.h"
 #include "BatterySensor.h"

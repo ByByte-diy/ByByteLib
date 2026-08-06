@@ -2,9 +2,14 @@
 
 > Abstract brushed dual-motor backend.
 >
-> **Header:** `src/MotorController.h`
+> **Header:** `src/motor/MotorController.h`
 > **Namespace:** `ByByte`
 > **Kind:** Abstract class (pure-virtual interface)
+
+> ⚠ **Primary public API is `MotorDriver`** — `MotorController` is the
+> abstract backend for custom driver implementations. Most users should use
+> `MotorDriver` (see [motor-driver.md](motor-driver.md)) which auto-selects
+> the correct driver chip and provides Direct + Differential modes.
 
 `MotorController` is the polymorphic backend behind brushed DC motor driver
 implementations (e.g. DRV8833, TB6612). It abstracts a **pair** of motors —
@@ -131,8 +136,8 @@ and right PWM values using wheel geometry, then forwards them to the
 
 | Class | Header | Bridge | Outline |
 |---|---|---|---|
-| `DRV8833MotorController` | `src/DRV8833MotorController.h` | DRV8833 (dual-PWM H-bridge) | 4 pins: `leftIn1/In2`, `rightIn1/In2`. `begin()` sets all four `OUTPUT`. `setMotorSpeeds()` drives each pair with complementary PWM via `writeHBridgePwm()`. |
-| `TB6612MotorController` | `src/TB6612MotorController.h` | TB6612 (DIR + PWM + STBY) | 7 pins: `stby`, `aIn1/aIn2/aPwm`, `bIn1/bIn2/bPwm`. `begin()` sets `OUTPUT` and asserts `stby` HIGH (out of standby). `setMotorSpeeds()` drives each channel via `writeTb6612Channel()`. |
+| `DRV8833MotorController` | `src/motor/DRV8833MotorController.h` | DRV8833 (dual-PWM H-bridge) | 4 pins: `leftIn1/In2`, `rightIn1/In2`. `begin()` sets all four `OUTPUT`. `setMotorSpeeds()` drives each pair with complementary PWM via `writeHBridgePwm()`. |
+| `TB6612MotorController` | `src/motor/TB6612MotorController.h` | TB6612 (DIR + PWM + STBY) | 7 pins: `stby`, `aIn1/aIn2/aPwm`, `bIn1/bIn2/bPwm`. `begin()` sets `OUTPUT` and asserts `stby` HIGH (out of standby). `setMotorSpeeds()` drives each channel via `writeTb6612Channel()`. |
 
 Both override `begin()` and `setMotorSpeeds()` per the contract above, and both
 rely on the free helpers in `MotorUtils.h` (`writeHBridgePwm`,
@@ -152,10 +157,10 @@ hardware-specific pin levels.
 
 - **`DifferentialDriveController`** holds a `MotorController&` and calls
   `setMotorSpeeds(pwmLeft, pwmRight)` from its `update()` step.
-- **`MotorDriver`** owns a heap-allocated `MotorController*` (resolved to a
-  `DRV8833MotorController` or `TB6612MotorController` from the configured
-  `DriverType`), forwards `setMotorSpeeds()` in Direct mode, and feeds a
-  `DifferentialDriveController` in Differential mode.
+- **`MotorDriver`** owns a concrete backend (`TB6612MotorController` or
+  `DRV8833MotorController`) by value, selected at compile time, and forwards
+  `setMotorSpeeds()` in Direct mode or feeds a `DifferentialDriveController`
+  in Differential mode.
 
 ---
 
@@ -166,7 +171,7 @@ hardware-specific pin levels.
 - PWM feasibility of the chosen pins is the caller's responsibility at this
   layer; `MotorDriver` performs `isPwmPin()` validation before constructing a
   concrete controller.
-- Effective PWM range is clamped to `[-255, 255]` by `MotorUtils.h::clampPwm`.
+- Effective PWM range is clamped to `[-255, 255]` by `src/motor/MotorUtils.h::clampPwm`.
 - Async/non-blocking behavior is out of scope for this interface — `setMotorSpeeds()`
   returns synchronous I/O to the hardware registers / Arduino `analogWrite()`.
 
@@ -176,10 +181,11 @@ hardware-specific pin levels.
 
 | File | Role for `MotorController` |
 |---|---|
-| `src/MotorController.h` | Declares the abstract interface (this document). |
-| `src/DRV8833MotorController.h` / `.cpp` | Public DRV8833 implementation. |
-| `src/TB6612MotorController.h` / `.cpp` | Public TB6612 implementation. |
-| `src/MotorUtils.h` | Free helpers (`writeHBridgePwm`, `writeTb6612Channel`, `clampPwm`) used by the implementations. |
-| `src/DifferentialDriveController.h` / `.cpp` | Consumes a `MotorController&` for kinematic control. |
-| `src/MotorDriver.h` / `.cpp` | Owns a `MotorController*` and selects the concrete backend. |
-| `src/Types.h` | `Twist` (linearX / angularZ) — the higher-level input converted down to PWM. |
+| `src/motor/MotorController.h` | Declares the abstract interface (this document). |
+| `src/motor/MotorTypes.h` | `MotorPins`, `ControlMode`, `DriverType` types used by the motor subsystem. |
+| `src/motor/DRV8833MotorController.h` / `.cpp` | Public DRV8833 implementation. |
+| `src/motor/TB6612MotorController.h` / `.cpp` | Public TB6612 implementation. |
+| `src/motor/MotorUtils.h` | Free helpers (`writeHBridgePwm`, `writeTb6612Channel`, `clampPwm`) used by the implementations. |
+| `src/motor/DifferentialDriveController.h` / `.cpp` | Consumes a `MotorController&` for kinematic control. |
+| `src/MotorDriver.h` / `.cpp` | Owns a concrete `MotorController` by value and selects the backend at compile time. |
+| `src/core/Types.h` | `Twist` (linearX / angularZ) — the higher-level input converted down to PWM. |

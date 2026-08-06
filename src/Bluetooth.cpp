@@ -1,21 +1,36 @@
-// Bluetooth.h keeps a pointer + forward declare of `class SoftwareSerial;` so headers stay
-// parseable without Arduino library paths. The full SoftwareSerial type is only needed on
+// Bluetooth.h keeps a pointer + forward declare of `class NeoSWSerial;` so headers stay
+// parseable without Arduino library paths. The full NeoSWSerial type is only needed on
 // non-Mega targets (the Mega uses HardwareSerial / Serial1).
 //
-// CRITICAL on the Mega: <SoftwareSerial.h> must NOT be included in this TU. SoftwareSerial.cpp
-// defines ISR(PCINT0_vect) / ISR(PCINT1_vect) / ISR(PCINT2_vect), which are __vector_9/10/11 on
-// ATmega2560. ByByteLib's PcintManager.cpp also defines those three ISRs on the Mega (it owns
-// Pin Change Interrupts there). Including <SoftwareSerial.h> here makes the Arduino builder link
-// SoftwareSerial.cpp.o into the Mega binary, causing "multiple definition of __vector_9/10/11".
-// The Mega branch never instantiates SoftwareSerial, so excluding the header resolves the clash.
+// CRITICAL — PCINT vector ownership on AVR:
+//   Bluetooth on non-Mega targets uses NeoSWSerial (an efficient SoftwareSerial
+//   replacement that, at 16 MHz, borrows Timer0's free-running counter for bit
+//   timing and therefore does NOT reconfigure Timer2 / break the buzzer's tone()).
+//   NeoSWSerial would normally define ISR(PCINT0/1/2_vect); to keep a single PCINT
+//   owner we compile NeoSWSerial with NEOSWSERIAL_EXTERNAL_PCINT so it emits NO ISR,
+//   and ByByteLib's PcintManager owns those vectors and routes byte edges back into
+//   the UART engine via the per-group raw-port hook -> NeoSWSerial::rxISR(port).
+//   The classic SoftwareSerial library is NOT linked anywhere, so there is no
+//   "multiple definition of __vector_*" clash with PcintManager.
 #include <Arduino.h>
 #include "Bluetooth.h"
+#include "core/PcintManager.h"
 
 #if BYBYTE_PLATFORM_ID != BYBYTE_PLATFORM_MEGA
-#include <SoftwareSerial.h>
+#ifndef NEOSWSERIAL_EXTERNAL_PCINT
+#define NEOSWSERIAL_EXTERNAL_PCINT   // make NeoSWSerial emit no ISR; we own PCINT
+#endif
+#include <NeoSWSerial.h>
 #endif
 
 namespace ByByte {
+
+#if BYBYTE_PLATFORM_ID != BYBYTE_PLATFORM_MEGA
+	// Glue for NEOSWSERIAL_EXTERNAL_PCINT: PcintManager owns the PCINT vectors and
+	// calls this with the live port-register value of the Bluetooth RX pin's group;
+	// NeoSWSerial::rxISR masks it with the RX bit internally to decode a byte.
+	static void btNeoSwPortHook(uint8_t port) { NeoSWSerial::rxISR(port); }
+#endif
 
 	// Bauds to try when hunting for AT mode (HC-0x family typical values)
 	static const uint32_t kProbeBauds[] = { 9600, 38400, 19200, 57600, 115200, 4800, 2400, 1200 };
@@ -26,16 +41,18 @@ namespace ByByte {
 #if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
 	Bluetooth::Bluetooth(HardwareSerial& uart, bb::pins::by_byte_mega::BtMegaBluetoothPins layout)
 		: _serial(&uart), _powerPin(layout.powerPin), _baud(0), _type(BtModuleType::Unknown), _isReady(false),
-		_isChecking(false), _checkAttempts(0), _lastCheckTime(0) {}
+		_isChecking(false), _checkAttempts(0), _lastCheckTime(0), _baudProbeDone(false) {}
 #else
 	Bluetooth::Bluetooth(bb::pins::by_byte_nano::BtSoftwareSerialPins pins)
-		: _pins(pins), _uart(new SoftwareSerial(pins.rx, pins.tx)), _baud(0), _type(BtModuleType::Unknown),
-		_isReady(false), _isChecking(false), _checkAttempts(0), _lastCheckTime(0) {}
+		: _pins(pins), _uart(new NeoSWSerial(pins.rx, pins.tx)), _baud(0), _type(BtModuleType::Unknown),
+		_isReady(false), _isChecking(false), _checkAttempts(0), _lastCheckTime(0), _baudProbeDone(false) {}
 #endif
 
 	Bluetooth::~Bluetooth() {
 #if BYBYTE_PLATFORM_ID != BYBYTE_PLATFORM_MEGA
-		// Arduino SoftwareSerial has no virtual destructor; delete is well-defined for this concrete type.
+		PcintManager::clearPortHook(2);     // BT RX is in PCINT group 2 on the Nano default (D2/D3)
+		// NeoSWSerial derives from Stream but its own destructor is non-virtual;
+		// deleting the concrete type is well-defined. Silence the GCC note.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdelete-non-virtual-dtor"
 		delete _uart;
@@ -68,9 +85,15 @@ namespace ByByte {
 		Serial.print(_powerPin);
 		Serial.println(F(" = HIGH"));
 #else
-		Serial.print(F("BT SoftwareSerial RX="));
+		// NeoSWSerial (external PCINT) needs PcintManager to own the RX pin's
+		// PCINT group and route edges to NeoSWSerial::rxISR. NeoSWSerial::listen()
+		// (called by begin()) already set the PCMSK/PCICR bits for the RX pin; we
+		// now register the per-group port hook so received bytes get decoded.
+		uint8_t rxGroup = digitalPinToPCICRbit(_pins.rx);   // 0/1/2 (PCIE0/1/2)
+		PcintManager::setPortHook(rxGroup, &btNeoSwPortHook);
+		Serial.print(F("BT NeoSWSerial RX=D"));
 		Serial.print(_pins.rx);
-		Serial.print(F(" TX="));
+		Serial.print(F(" TX=D"));
 		Serial.println(_pins.tx);
 #endif
 		closeUart();

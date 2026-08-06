@@ -8,10 +8,12 @@
  * Works on:
  * - Arduino Nano (DRV8833) and Mega (TB6612), pins auto-detected
  *
- * Usage:
- * - Upload and the robot will move forward, turn, backward, turn, then stop
+ * Module-only usage:
+ * - This sketch pulls in the ByByteMotor module alone (see platformio.ini),
+ *   not the full ByByteLib aggregate. Only the motor .cpp units are compiled
+ *   and linked — nothing else (no Bluetooth, timers, PCINT, ...).
  */
-#include <ByByteLib.h>
+#include <MotorDriver.h>
 
 using namespace ByByte;
 

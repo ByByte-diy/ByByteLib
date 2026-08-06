@@ -201,5 +201,5 @@ construct(adcPin, invert) ──► autoCalibrate() (or calibrateStep() x N) ─
 | File | Role for `LdrSensor` |
 |---|---|
 | `src/LdrSensor.h` | Defines the class (header-only, all inline). |
-| `src/configs/ByByteConfig.h` | Provides the `BYBYTE_LDR_ADC_PIN` default (`A5` on Nano, `A2` on Mega). |
-| `src/configs/PlatformDetect.h` | Selects the `BYBYTE_PLATFORM_ID` used by `ByByteConfig.h`. |
+| `src/core/configs/ByByteConfig.h` | Provides the `BYBYTE_LDR_ADC_PIN` default (`A5` on Nano, `A2` on Mega). |
+| `src/core/configs/PlatformDetect.h` | Selects the `BYBYTE_PLATFORM_ID` used by `ByByteConfig.h`. |

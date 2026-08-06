@@ -295,5 +295,5 @@ construct(powerPin, leftPin, rightPin, invert) ──► begin() ──► autoC
 | File | Role for `SideIrSensors` |
 |---|---|
 | `src/SideIrSensors.h` | Defines the class (header-only, all inline). |
-| `src/configs/ByByteConfig.h` | Provides `BYBYTE_IR_POWER_PIN`, `BYBYTE_IR_LEFT_PIN`, `BYBYTE_IR_RIGHT_PIN` defaults per platform. |
-| `src/configs/PlatformDetect.h` | Selects the `BYBYTE_PLATFORM_ID` (NANO / MEGA) that `ByByteConfig.h` branches on. |
+| `src/core/configs/ByByteConfig.h` | Provides `BYBYTE_IR_POWER_PIN`, `BYBYTE_IR_LEFT_PIN`, `BYBYTE_IR_RIGHT_PIN` defaults per platform. |
+| `src/core/configs/PlatformDetect.h` | Selects the `BYBYTE_PLATFORM_ID` (NANO / MEGA) that `ByByteConfig.h` branches on. |

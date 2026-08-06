@@ -6,12 +6,12 @@
  * - forward/backward/turnLeft/turnRight/stop with fixed speeds and delays
  *
  * Works on:
- * - Arduino Nano and Mega (pins auto-detected from configs/ByByteConfig)
+ * - Arduino Nano (DRV8833) and Mega (TB6612), pins auto-detected from ByByteConfig
  *
- * Usage:
- * - Upload and observe the robot perform a simple movement routine
+ * Module-only usage:
+ * - Pulls in the ByByteMotor module alone (see platformio.ini).
  */
-#include <ByByteLib.h>
+#include <MotorDriver.h>
 
 using namespace ByByte;
 
@@ -25,16 +25,16 @@ void loop() {
 	// Simple movement methods
 	motor.forward(100);
 	delay(1000);
-	
+
 	motor.turnLeft(80);
 	delay(800);
-	
+
 	motor.backward(100);
 	delay(1000);
-	
+
 	motor.turnRight(80);
 	delay(800);
-	
+
 	motor.stop();
 	delay(500);
 }

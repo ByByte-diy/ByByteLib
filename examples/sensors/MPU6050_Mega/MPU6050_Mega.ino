@@ -10,7 +10,7 @@
  */
 
 #include <Wire.h>
-#include <MPU6050.h>
+#include <MPU6050_tockn.h>
 #include <LiquidCrystal_I2C.h>
 
 static LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -25,7 +25,7 @@ void setup() {
   // Optional: calibrate with static offsets if needed
   // mpu.calcGyroOffsets(true);
   
-  lcd.begin();
+  lcd.init();
   lcd.backlight();
   lcd.clear();
   lcd.setCursor(0,0); lcd.print("F/B:");

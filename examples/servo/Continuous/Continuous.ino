@@ -8,6 +8,10 @@
  * Notes:
  * - Intended for Arduino Mega only.
  * - Servos run via ServoManager (Timer3), independent from motor PWM.
+ *
+ * Module-only usage:
+ * - Pulls in ByByteServo only. The Arduino built-in "Servo" library is ignored
+ *   since ByByteServo provides the same <Servo.h> header (class ByByte::Servo).
  */
 #include <ByByteLib.h>
 

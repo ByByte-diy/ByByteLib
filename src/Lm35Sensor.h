@@ -2,7 +2,7 @@
 #define BYBYTE_LM35_SENSOR_H
 
 #include <Arduino.h>
-#include "configs/ByByteConfig.h"
+#include "core/ByByteCore.h"
 
 namespace ByByte {
 

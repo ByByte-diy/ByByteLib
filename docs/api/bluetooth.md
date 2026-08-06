@@ -7,13 +7,15 @@
 > **Header:** `src/Bluetooth.h`
 > **Namespace:** `ByByte`
 > **Kind:** Concrete class
+>
+> **Version:** 0.2.0
 
 `Bluetooth` abstracts the wiring differences between the ByByte boards:
 
 | Platform | Transport | Power control | Constructor args |
 |---|---|---|---|
 | **Mega** (`BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA`) | `HardwareSerial` (default `BYBYTE_BT_UART` = `Serial1`) | Optional supply gating on a digital power pin (default `BYBYTE_BT_PWR_PIN` = `29`; **HIGH** powers the module) | `HardwareSerial& uart`, `BtMegaBluetoothPins layout` |
-| **Nano / other** | `SoftwareSerial` (heap-allocated) on configurable RX/TX (default `BYBYTE_BT_SW_RX_PIN` = `2`, `BYBYTE_BT_SW_TX_PIN` = `3`); always powered | none | `BtSoftwareSerialPins pins` |
+| **Nano / other** | `NeoSWSerial` (heap-allocated) on configurable RX/TX (default `BYBYTE_BT_SW_RX_PIN` = `2`, `BYBYTE_BT_SW_TX_PIN` = `3`); always powered | none | `BtSoftwareSerialPins pins` |
 
 The class is **non-blocking** after `begin()`: it opens the UART at the
 requested baud, then asks the caller to poll `isReady()` (or call
@@ -154,6 +156,82 @@ the default factory `defaultBluetoothSoftwareSerialPins()` returns
 
 ---
 
+## Shared-PCINT Architecture (Nano)
+
+On non-Mega targets the Nano transport is **`NeoSWSerial`** (library
+`slashdevin/NeoSWSerial`), not the Arduino `SoftwareSerial`. The constructor
+argument name `BtSoftwareSerialPins` is **kept for ABI / source
+compatibility** — only the underlying object changed.
+
+### Why NeoSWSerial
+
+At 16 MHz, `NeoSWSerial` borrows **Timer 0's free-running counter** (the
+`millis()` timer) for bit-time sampling. It does **not** reconfigure Timer 2,
+so it never clashes with:
+
+- the buzzer's `tone()` — which drives **Timer 2** on AVR — and
+- the D9/D10 motor PWM — which depends on Timer 1 / Timer 2 platform-specific
+  allocation but never touches the counters NeoSWSerial uses.
+
+The old `SoftwareSerial` library reconfigured Timer 2 for its own bit timing
+and also defined its own `ISR(PCINT0/1/2_vect)` handlers, which collided with
+`tone()` *and* with `PcintManager` for the PCINT vectors.
+
+### PCINT conflict-free routing
+
+`PcintManager` (ByByteLib `src/core/PcintManager`) is the **single owner** of
+the `PCINT0_vect` / `PCINT1_vect` / `PCINT2_vect` vectors on both Nano and
+Mega. NeoSWSerial is compiled with **`-DNEOSWSERIAL_EXTERNAL_PCINT`**, which
+suppresses its built-in `ISR(PCINTx_vect)` definitions (it instead exposes
+`NeoSWSerial::rxISR(uint8_t port)`).
+
+The plumbing is:
+
+1. `Bluetooth::begin()` computes
+   `rxGroup = digitalPinToPCICRbit(_pins.rx)` (0 / 1 / 2 = `PCIE0/1/2`).
+2. It registers the per-group raw-port hook:
+   `PcintManager::setPortHook(rxGroup, &btNeoSwPortHook)`.
+3. `btNeoSwPortHook` is a thin trampoline that calls
+   `NeoSWSerial::rxISR(port)`.
+4. `PcintManager`'s `PCINTx_vect` ISR captures the **live port register**
+   (`PINB` / `PINC` / `PIND`) and passes it to the registered hook, which
+   decodes the incoming byte. NeoSWSerial masks the RX bit internally.
+
+`NeoSWSerial::listen()` (invoked by `begin`) sets the `PCMSK` / `PCICR` bits
+for the RX pin itself — no manual `PCMSK` manipulation is required from user
+code.
+
+### Build setup
+
+Every Nano (non-Mega) PlatformIO environment must:
+
+- depend on the library: `lib_deps = slashdevin/NeoSWSerial`, and
+- build with `-DNEOSWSERIAL_EXTERNAL_PCINT`.
+
+Omitting the flag makes NeoSWSerial emit its own `ISR(PCINTx_vect)`
+definitions, producing a **`multiple definition of __vector_3 / __vector_4 /
+__vector_5`** link error against `PcintManager`.
+
+> The ctor still takes `bb::pins::by_byte_nano::BtSoftwareSerialPins`, so the
+> ABI change is invisible to source code; only the runtime transport changed.
+
+### `begin()` flow (Nano)
+
+1. `rxGroup = digitalPinToPCICRbit(_pins.rx)` — 0 / 1 / 2.
+2. `PcintManager::setPortHook(rxGroup, &btNeoSwPortHook)` — route PCINT edges
+   to NeoSWSerial's decoder.
+3. `closeUart()` / `openUart(desiredBaud)` — `NeoSWSerial::listen()` sets the
+   `PCMSK`/`PCICR` bits; `begin(baud)` opens the bit-bang RX/TX.
+
+### Destruction
+
+`~Bluetooth()` (Nano) calls `PcintManager::clearPortHook(2)` *before*
+`delete _uart`. NeoSWSerial's destructor is non-virtual, so the `delete` is
+emitted under a `#pragma GCC diagnostic ignored "-Wdelete-non-virtual-dtor"`
+guard to silence the GCC note; deleting the concrete type is well-defined.
+
+---
+
 ## Public interface
 
 ### Constructor (per-platform — see above)
@@ -163,7 +241,7 @@ Constructs the bridge bound to its transport.
 | Platform | What the ctor does |
 |---|---|
 | Mega | Records the `HardwareSerial*` and `powerPin`. No I/O. |
-| Nano/other | Records the pin pair and **heap-allocates** a `SoftwareSerial(rx, tx)`. No I/O. |
+| Nano/other | Records the pin pair and **heap-allocates** a `NeoSWSerial(rx, tx)`. No I/O. |
 
 Non-blocking; the UART is opened later by `begin()`.
 
@@ -174,7 +252,7 @@ Releases the transport.
 | Platform | What the dtor does |
 |---|---|
 | Mega | (UART lifetime is owned by the Arduino core; nothing is freed.) |
-| Nano/other | `delete`s the heap `SoftwareSerial*`. |
+| Nano/other | `PcintManager::clearPortHook(2)` then `delete`s the heap `NeoSWSerial*` (deletion guarded against NeoSWSerial's non-virtual dtor). See [Shared-PCINT Architecture (Nano)](#shared-pcint-architecture-nano). |
 
 ### Copy operations — deleted
 
@@ -183,9 +261,9 @@ Bluetooth(const Bluetooth&)            = delete;
 Bluetooth& operator=(const Bluetooth&) = delete;
 ```
 
-`Bluetooth` owns the transport handle / heap `SoftwareSerial`; copying would
-alias the same UART with two objects. Move is not provided either — pass
-instances by reference or hold them by value in a single owner.
+`Bluetooth` owns the transport handle (Mega) / heap `NeoSWSerial` (Nano);
+copying would alias the same UART with two objects. Move is not provided
+either — pass instances by reference or hold them by value in a single owner.
 
 ### `bool begin(uint32_t desiredBaud = 9600)`
 
@@ -448,7 +526,7 @@ construct(uart/pins) ──► begin(baud) ──► isReady() poll (loop) ─�
 ```
 
 1. **Construct** with the platform transport (Mega: `HardwareSerial&` +
-   power layout; Nano: SoftwareSerial pins).
+   power layout; Nano: `NeoSWSerial` pins, passed as `BtSoftwareSerialPins`).
 2. **`begin(baud)`** once — powers the module (Mega), opens the UART, arms
    the readiness check.
 3. **Poll `isReady()`** from `loop()` until it returns `true` (the module
@@ -459,8 +537,8 @@ construct(uart/pins) ──► begin(baud) ──► isReady() poll (loop) ─�
    `restoreDefault`, …) while in AT mode. After `reset()`, call
    `startReadinessCheck()` and re-probe `isReady()`.
 6. **`powerOff()`** (Mega) to cut supply; **`powerOn()`** / `begin()` to
-   restart. Held by value; the dtor releases the heap `SoftwareSerial` on
-   the Nano.
+   restart. Held by value; on the Nano the dtor clears the PCINT port hook
+   and releases the heap `NeoSWSerial`.
 
 ---
 
@@ -481,9 +559,9 @@ construct(uart/pins) ──► begin(baud) ──► isReady() poll (loop) ─�
   power the module; `powerOff()` asserts LOW.
 - **Nano has no power control:** the module is assumed always powered;
   `powerOn()/powerOff()` are no-ops.
-- **Single transport per instance:** one `Bluetooth` owns one UART /
-  `SoftwareSerial`. Multiple instances on distinct UARTs are possible but
-  share the AVR's limited hardware serial / timer resources.
+- **Single transport per instance:** one `Bluetooth` owns one UART (Mega) /
+  one `NeoSWSerial` (Nano). Multiple instances on distinct UARTs are possible
+  but share the AVR's limited hardware serial / timer resources.
 - **No public accessors** for `_isReady` internals beyond `isReady()` /
   `isChecking()`; `_baud` is exposed via `baud()`, `_type` via `moduleType()`.
   All probe/AT internals (`enterAtMode`, `detectModuleType`, `sendAT`, …) are
@@ -501,8 +579,8 @@ construct(uart/pins) ──► begin(baud) ──► isReady() poll (loop) ─�
 | File | Role for `Bluetooth` |
 |---|---|
 | `src/Bluetooth.h` | Declares `BtModuleType`, the `Bluetooth` class, and the platform-conditional constructor. |
-| `src/Bluetooth.cpp` | Implements the class; includes `<SoftwareSerial.h>` on non-Mega targets; holds the AT read/parse loop. |
-| `src/configs/ByByteConfig.h` | Provides `BYBYTE_BT_UART` / `BYBYTE_BT_PWR_PIN` (Mega) and `BYBYTE_BT_SW_RX_PIN` / `BYBYTE_BT_SW_TX_PIN` (Nano) defaults. |
-| `src/configs/BbPinsByByteMega.h` | Defines `bb::pins::by_byte_mega::BtMegaBluetoothPins` + `defaultBluetoothMega()`. |
-| `src/configs/BbPinsByByteNano.h` | Defines `bb::pins::by_byte_nano::BtSoftwareSerialPins` + `defaultBluetoothSoftwareSerialPins()`. |
-| `src/configs/PlatformDetect.h` | Defines `BYBYTE_PLATFORM_ID` / `BYBYTE_PLATFORM_MEGA` that select the constructor + transport. |
+| `src/Bluetooth.cpp` | Implements the class; includes `<NeoSWSerial.h>` (compiled with `-DNEOSWSERIAL_EXTERNAL_PCINT`) on non-Mega targets and registers the PCINT port hook via `PcintManager`; holds the AT read/parse loop. |
+| `src/core/configs/ByByteConfig.h` | Provides `BYBYTE_BT_UART` / `BYBYTE_BT_PWR_PIN` (Mega) and `BYBYTE_BT_SW_RX_PIN` / `BYBYTE_BT_SW_TX_PIN` (Nano) defaults. |
+| `src/core/configs/BbPinsByByteMega.h` | Defines `bb::pins::by_byte_mega::BtMegaBluetoothPins` + `defaultBluetoothMega()`. |
+| `src/core/configs/BbPinsByByteNano.h` | Defines `bb::pins::by_byte_nano::BtSoftwareSerialPins` + `defaultBluetoothSoftwareSerialPins()`. |
+| `src/core/configs/PlatformDetect.h` | Defines `BYBYTE_PLATFORM_ID` / `BYBYTE_PLATFORM_MEGA` that select the constructor + transport. |

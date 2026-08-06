@@ -2,60 +2,45 @@
 #define BYBYTE_BUZZER_H
 
 #include <Arduino.h>
-#include "configs/ByByteConfig.h"
+#include "core/ByByteCore.h"
 
 namespace ByByte {
 
-// Non-blocking hardware-PWM buzzer
-class Buzzer {
-public:
-    explicit Buzzer(uint8_t pin = BYBYTE_HORN_PIN);
-    void begin();
+// Non-blocking buzzer API (free functions, single global pin).
+//
+// Why free functions: a buzzer is a single passive horn driven by tone/noTone.
+// There is no need for multiple instances or per-instance state, so a class
+// wrapper would only add overhead. State lives file-scope in Buzzer.cpp.
+//
+// Usage:
+//   buzzerBegin();            // uses BYBYTE_HORN_PIN from config
+//   buzzerTone(1000, 300);    // 1 kHz for 300 ms
+//   buzzerPatternCarHorn();  // start a non-blocking pattern
+//   buzzerUpdate();           // call often (e.g. from loop)
 
-    // Start tone at frequency (Hz) and optional duration (ms). duration=0 -> sustain
-    void tone(uint16_t freqHz, uint16_t durationMs = 0);
-    void noTone();
+// Initialize the buzzer pin. Defaults to the platform horn pin from ByByteConfig.
+void buzzerBegin(uint8_t pin = BYBYTE_HORN_PIN);
 
-    // Call often (e.g., in loop) to stop tone when duration elapsed
-    void update();
+// Start a tone at freqHz for durationMs (0 = sustain until buzzerNoTone()).
+void buzzerTone(uint16_t freqHz, uint16_t durationMs = 0);
 
-    // Built-in patterns (non-blocking): call, then keep calling update()
-    void patternCarHorn(uint16_t repeat = 2, uint16_t baseHz = 440);   // two beeps, adjustable pitch
-    void patternSiren(uint16_t repeat = 2);     // alternating hi/lo
-    void patternR2D2();                         // fun sequence
-    void patternClick();                        // short key click
-    // Multi-tone cues
-    void patternHappy();
-    void patternSad();
-    void patternSurprise();
-    void patternDisconnect();
-    void patternButton();
+// Stop any tone / pattern immediately.
+void buzzerNoTone();
 
-private:
-    uint8_t _pin;
-    uint32_t _untilMs;
+// Drive non-blocking patterns. Start one, then keep calling buzzerUpdate().
+void buzzerPatternCarHorn(uint16_t repeat = 2, uint16_t baseHz = 440);
+void buzzerPatternSiren(uint16_t repeat = 2);
+void buzzerPatternR2D2();
+void buzzerPatternClick();
+void buzzerPatternHappy();
+void buzzerPatternSad();
+void buzzerPatternSurprise();
+void buzzerPatternDisconnect();
+void buzzerPatternButton();
 
-    // pattern state
-    const uint16_t* _seqFreq;
-    const uint16_t* _seqDur;
-    uint8_t _seqLen;
-    uint8_t _seqIdx;
-    uint16_t _seqRepeat;
-    uint32_t _seqNextMs;
-    bool _seqProgmem;   // true  -> _seqFreq/_seqDur live in PROGMEM (read via pgm_read_word)
-                        // false -> they live in RAM (e.g. _tmpFreq/_tmpDur)
-
-    // Temporary buffers for custom patterns (small fixed capacity)
-    uint16_t _tmpFreq[8];
-    uint16_t _tmpDur[8];
-
-    void startPwm(uint16_t freqHz);
-    void stopPwm();
-    void startSequence(const uint16_t* f, const uint16_t* d, uint8_t n, uint16_t repeat, bool progmem);
-};
+// Advance finite-duration tones and pattern sequences. Call from loop().
+void buzzerUpdate();
 
 } // namespace ByByte
 
 #endif // BYBYTE_BUZZER_H
-
-

@@ -1,85 +1,87 @@
 /*
- * ByByteLib - IR Receiver + Motor Control
+ * ByByteLib - IR Receiver Diagnostic (Nano / Mega)
+ * -------------------------------------------------
+ * Standalone IR receive test using the Arduino-IRremote library directly
+ * (the `IrReceiver` instance + `decode()` / `resume()` API). It is independent
+ * of ByByteLib's modules and PcintManager, so it serves as a clean reference
+ * that confirms your IR receiver hardware + remote are seen by IRremote, and
+ * prints the decoded protocol / address / command plus the raw timing buffer
+ * so you can read your remote's exact codes.
  *
- * Purpose:
- * - Receive IR commands (Auto: NEC, RC5, RC6) and drive the robot
- * - Maps arrow keys to movement via MotorDriver convenience methods
+ * IMPORTANT (AVR): IRremote's IrReceiver uses Timer2 for receive timing. Do NOT
+ * run the buzzer (tone()) in this same sketch — tone() also owns Timer2 and they
+ * conflict. The buzzer is not used here, so this sketch is conflict-free.
  *
- * Hardware:
- * - IR RX pin auto-detected (Nano: D8, Mega: PJ1/D14)
+ * Wiring (IR receiver module OUT -> Arduino digital pin):
+ *   - Nano: connect to D8  (the ByByteNano default IR RX pin)
+ *   - Mega: connect to D14 (the ByByteMega  default IR RX pin)
+ *   Set IR_RECEIVE_PIN below to match your wiring.
  *
- * Usage:
- * - Open Serial Monitor @115200 to see decoded frames
- * - Use a common Arduino remote; adjust key codes if needed
+ * Build:  pio run -e nano  |  pio run -e mega
+ * Upload, open Serial Monitor @115200, point a remote at the receiver and
+ * press any key. Each frame prints:
+ *   - decoded protocol / address / command / decodedRawData / isRepeat
+ *   - numberOfBits
+ *   - the formatted raw timing dump (50 us ticks, Mark + Space alternating)
  */
-#include <ByByteLib.h>
 
-using namespace ByByte;
+ // --- IR receive pin ---------------------------------------------------------
+ // Change this to match your wiring. Defaults below match the ByByte kits:
+ //   Nano -> D8, Mega -> D14.
+#if defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1280__)
+#  define IR_RECEIVE_PIN  14
+#else
+#  define IR_RECEIVE_PIN  8
+#endif
 
-IrReceiver ir(IrProtocol::Auto);
-MotorDriver motor; // Auto-detected: DRV8833 on Nano / TB6612 on Mega
+// Optional: omit feedback LED code (we have no feedback LED wired).
+#define NO_LED_FEEDBACK_CODE
 
-// Common NEC key codes on cheap remotes (adjust if needed)
-// These are typical values; print received frames to learn your remote
-const uint8_t KEY_UP = 0x18; // ▲
-const uint8_t KEY_DOWN = 0x52; // ▼
-const uint8_t KEY_LEFT = 0x08; // ◄
-const uint8_t KEY_RIGHT = 0x5A; // ►
-const uint8_t KEY_OK = 0x1C; // OK/Enter
-const uint8_t KEY_STOP = 0x16; // often labeled as '0' or STOP
+#include <IRremote.hpp>
 
 void setup() {
-	Serial.begin(9600);
-	Serial.println(F("=== IR Receiver Demo ==="));
-	motor.begin();
-	ir.begin();
-	Serial.print(F("IR RX pin: ")); Serial.println(BYBYTE_IR_RX_PIN);
-}
+	Serial.begin(115200);
+	while (!Serial) {}
 
-void handleCommand(const IrFrame& f) {
-	// Basic control mapping
-	switch (f.command) {
-	case KEY_UP:
-		motor.forward(120);
-		Serial.println(F("CMD: FORWARD"));
-		break;
-	case KEY_DOWN:
-		motor.backward(120);
-		Serial.println(F("CMD: BACKWARD"));
-		break;
-	case KEY_LEFT:
-		motor.turnLeft(120);
-		Serial.println(F("CMD: TURN LEFT"));
-		break;
-	case KEY_RIGHT:
-		motor.turnRight(120);
-		Serial.println(F("CMD: TURN RIGHT"));
-		break;
-	case KEY_OK:
-		motor.setTargetVelocity(0, 0); // switch to differential idle
-		motor.stop();
-		Serial.println(F("CMD: OK / STOP"));
-		break;
-	case KEY_STOP:
-		motor.stop();
-		Serial.println(F("CMD: STOP"));
-		break;
-	default:
-		Serial.print(F("CMD: 0x")); Serial.print(f.command, HEX);
-		Serial.print(F(" proto=")); Serial.println((int)f.proto);
-		break;
-	}
+	Serial.println();
+	Serial.println(F("=== IR Receiver Diagnostic (IRremote) ==="));
+	Serial.print(F("RX pin  = D")); Serial.println(IR_RECEIVE_PIN);
+	Serial.println(F("Timer2  = reserved by IRremote (do NOT use buzzer/tone here)"));
+	Serial.println(F("Ready. Point your remote at the IR receiver and press a key."));
+	Serial.println();
+
+	// Start the IRremote receiver. Second arg = LED feedback (false = disabled).
+	IrReceiver.begin(IR_RECEIVE_PIN, DISABLE_LED_FEEDBACK);
 }
 
 void loop() {
-	if (ir.available()) {
-		IrFrame f = ir.read();
-		Serial.print(F("IR: proto=")); Serial.print((int)f.proto);
-		Serial.print(F(" addr=0x")); Serial.print(f.address, HEX);
-		Serial.print(F(" cmd=0x")); Serial.print(f.command, HEX);
-		Serial.print(F(" rep=")); Serial.println(f.repeat ? "Y" : "N");
-		if (!f.repeat) handleCommand(f);
+	if (IrReceiver.decode()) {
+
+		Serial.println(F("------ IR frame received ------"));
+
+		// Decoded summary. IrReceiver fills decodedIRData during decode().
+		Serial.print(F("protocol       = "));
+		Serial.println(getProtocolString(IrReceiver.decodedIRData.protocol));
+		Serial.print(F("address        = 0x"));
+		Serial.println(IrReceiver.decodedIRData.address, HEX);
+		Serial.print(F("command        = 0x"));
+		Serial.println(IrReceiver.decodedIRData.command, HEX);
+		Serial.print(F("decodedRawData = 0x"));
+		Serial.println((unsigned long)IrReceiver.decodedIRData.decodedRawData, HEX);
+		Serial.print(F("numberOfBits   = "));
+		Serial.println(IrReceiver.decodedIRData.numberOfBits);
+		Serial.print(F("isRepeat       = "));
+		Serial.println((IrReceiver.decodedIRData.flags & IRDATA_FLAGS_IS_REPEAT)
+			? F("YES") : F("NO"));
+
+		// IRremote's own raw timing dump (50 us ticks, Mark / Space alternating).
+		Serial.println(F("--- raw timing dump (50 us ticks) ---"));
+		IrReceiver.printIRResultRawFormatted(&Serial, true);
+
+		Serial.println(F("--------------------------------"));
+		Serial.println();
+
+		// Arm the next frame.
+		IrReceiver.resume();
 	}
-	motor.update();
-	delay(10);
 }

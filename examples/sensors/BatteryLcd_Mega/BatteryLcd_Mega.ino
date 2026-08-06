@@ -8,10 +8,10 @@
  * Hardware:
  * - Arduino Mega, BatterySensor on A0, CHRG on PJ0, 1602 I2C LCD @0x27
  *
- * Usage:
- * - Upload and observe live battery readouts on the LCD
+ * Module-only usage:
+ * - Pulls in ByByteSensors (header-only value classes) + external LCD lib.
  */
-#include <ByByteLib.h>
+#include <BatterySensor.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
@@ -21,7 +21,7 @@ BatterySensor bat;
 LiquidCrystal_I2C lcd(0x27, 16, 2); // change address if needed
 
 void setup() {
-	lcd.begin();
+	lcd.init();
 	lcd.backlight();
 	bat.begin();
 	lcd.setCursor(0,0);

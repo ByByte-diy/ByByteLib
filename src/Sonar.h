@@ -2,9 +2,9 @@
 #define BYBYTE_SONAR_H
 
 #include <Arduino.h>
-#include "TimerManager.h"
-#include "configs/PlatformDetect.h"
-#include "PcintManager.h"
+#include "core/TimerManager.h"
+#include "core/ByByteCore.h"
+#include "core/PcintManager.h"
 
 namespace ByByte {
 

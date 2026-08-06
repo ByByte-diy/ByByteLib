@@ -308,5 +308,5 @@ construct() ──► attach(pin, minUs, maxUs, frameHz) ──► write(...) / 
 | `src/Servo.cpp` | Implements `Servo` by delegating to `ServoManager` on the Mega; no-ops elsewhere. |
 | `src/ServoManager.h` | Declares `ServoManager` (static, Mega-guarded): the Timer3 driver behind `Servo`. |
 | `src/ServoManager.cpp` | Implements `ServoManager` + `ISR(TIMER3_COMPA_vect)`. |
-| `src/configs/PlatformDetect.h` | Defines `BYBYTE_PLATFORM_ID` / `BYBYTE_PLATFORM_MEGA`, which gate every method. |
-| `src/configs/ByByteConfig.h` | Provides `BYBYTE_SERVO0/1/2_PIN` defaults (`30`, `31`, `32`) on the Mega. |
+| `src/core/configs/PlatformDetect.h` | Defines `BYBYTE_PLATFORM_ID` / `BYBYTE_PLATFORM_MEGA`, which gate every method. |
+| `src/core/configs/ByByteConfig.h` | Provides `BYBYTE_SERVO0/1/2_PIN` defaults (`30`, `31`, `32`) on the Mega. |

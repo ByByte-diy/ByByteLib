@@ -1,8 +1,8 @@
 {
   "name": "ByByteLib",
-  "version": "0.1.0",
-  "description": "Cross-platform robotics control API for Arduino-compatible boards.",
-  "keywords": ["robotics", "motor", "kinematics", "sensors", "arduino"],
+  "version": "0.2.0",
+  "description": "Cross-platform robotics control library for Arduino-compatible boards: motors (DRV8833/TB6612), buzzer, sensors, Bluetooth, IR, servo, sonar.",
+  "keywords": ["robotics", "motor", "kinematics", "sensors", "bluetooth", "arduino"],
   "authors": [
     {
       "name": "ByByte Team",
@@ -16,6 +16,12 @@
     "url": "https://github.com/ByByte-diy/ByByteLib.git"
   },
   "frameworks": ["arduino"],
-  "platforms": ["*"]
+  "platforms": ["*"],
+  "dependencies": [
+    {
+      "name": "NeoSWSerial",
+      "version": "^3.0.5",
+      "owner": "slashdevin"
+    }
+  ]
 }
-

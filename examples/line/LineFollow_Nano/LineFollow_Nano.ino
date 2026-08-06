@@ -7,9 +7,13 @@
  *
  * Hardware:
  * - Nano: 5 digital line sensors (A0..A4 via Schmitt triggers)
- * - Pins auto-detected from configs/ByByteConfig
+ * - Pins auto-detected from ByByteConfig
+ *
+ * Module-only usage:
+ * - Pulls in ByByteMotor (for differential drive) plus external QTR lib.
  */
-#include <ByByteLib.h>
+#include <MotorDriver.h>
+#include <ByByteCore.h>
 #include <QTRSensors.h>
 
 using namespace ByByte;

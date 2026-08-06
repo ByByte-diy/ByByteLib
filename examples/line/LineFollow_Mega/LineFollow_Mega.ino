@@ -9,9 +9,12 @@
  * Hardware:
  * - Mega: 6 analog line sensors (A8..A13) + power pin (D26)
  * - 1602 I2C LCD at 0x27 (adjust if needed)
+ *
+ * Module-only usage:
+ * - Pulls in ByByteMotor (for differential drive) plus external QTR + LCD libs.
  */
-
-#include <ByByteLib.h>
+#include <MotorDriver.h>
+#include <ByByteCore.h>
 #include <QTRSensors.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
@@ -48,7 +51,7 @@ void setup() {
 	qtr.setTypeAnalog();
 	qtr.setSensorPins(qtrPins, SENSOR_COUNT);
 	// LCD
-	lcd.begin();
+	lcd.init();
 	lcd.backlight();
 	lcd.setCursor(0,0);
 	lcd.print("Line Follow MEGA");

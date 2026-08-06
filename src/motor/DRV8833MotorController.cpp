@@ -4,7 +4,7 @@
 namespace ByByte {
 
 DRV8833MotorController::DRV8833MotorController(uint8_t leftIn1, uint8_t leftIn2,
-						  uint8_t rightIn1, uint8_t rightIn2)
+                                               uint8_t rightIn1, uint8_t rightIn2)
 	: _lIn1(leftIn1), _lIn2(leftIn2), _rIn1(rightIn1), _rIn2(rightIn2) {}
 
 bool DRV8833MotorController::begin() {

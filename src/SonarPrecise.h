@@ -2,8 +2,8 @@
 #define BYBYTE_SONAR_PRECISE_H
 
 #include <Arduino.h>
-#include "TimerManager.h"
-#include "configs/PlatformDetect.h"
+#include "core/TimerManager.h"
+#include "core/ByByteCore.h"
 
 namespace ByByte {
 

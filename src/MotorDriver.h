@@ -2,63 +2,59 @@
 #define BYBYTE_MOTOR_DRIVER_H
 
 #include <Arduino.h>
-#include "Types.h"
-#include "MotorController.h"
-#include "DifferentialDriveController.h"
+
+#include "core/Types.h"
+#include "core/ByByteCore.h"
+#include "motor/MotorTypes.h"
+#include "motor/MotorController.h"
+#include "motor/DRV8833MotorController.h"
+#include "motor/TB6612MotorController.h"
+#include "motor/DifferentialDriveController.h"
 
 namespace ByByte {
 
-enum class DriverType { DRV8833, TB6612 };
-
-enum class ControlMode { Direct, Differential };
-
-/** Pin bundle: DRV8833 uses in1/in2 per side; TB6612 uses dir pins + PWM + STBY. */
-struct MotorPins {
-	uint8_t leftIn1 = 0, leftIn2 = 0, rightIn1 = 0, rightIn2 = 0;
-	uint8_t leftPwm = 0, rightPwm = 0, stby = 0;
-
-	static MotorPins drv8833(uint8_t l1, uint8_t l2, uint8_t r1, uint8_t r2) {
-		MotorPins p;
-		p.leftIn1 = l1;
-		p.leftIn2 = l2;
-		p.rightIn1 = r1;
-		p.rightIn2 = r2;
-		return p;
-	}
-	static MotorPins tb6612(uint8_t lIn1, uint8_t lIn2, uint8_t lPwm, uint8_t rIn1, uint8_t rIn2, uint8_t rPwm, uint8_t standby) {
-		MotorPins p;
-		p.leftIn1 = lIn1;
-		p.leftIn2 = lIn2;
-		p.leftPwm = lPwm;
-		p.rightIn1 = rIn1;
-		p.rightIn2 = rIn2;
-		p.rightPwm = rPwm;
-		p.stby = standby;
-		return p;
-	}
-};
-
+/**
+ * Self-contained motor module.
+ *
+ * Pulling in this header does NOT bring any other ByByte module (Bluetooth,
+ * sensors, timers, PCINT, ...) — only the motor backend, which is what keeps a
+ * project free of unrelated ISR / hardware conflicts.
+ *
+ * The driver silicon is selected at compile time from PlatformDetect
+ * (TB6612 on Mega, DRV8832 otherwise), so the backend lives by value with no
+ * heap allocation. Pin defaults come from configs/ByByteConfig.h when the user
+ * does not pass an explicit MotorPins bundle.
+ *
+ * Two control modes share one instance:
+ *   - Direct       : setMotorSpeeds(left, right) -> per-wheel PWM (-255..255)
+ *   - Differential : setTargetVelocity(linear, angular) + update() -> Twist kinematics
+ */
 class MotorDriver {
 public:
-	/** Driver auto-detected from build target: TB6612 on Mega, DRV8833 on Nano (and unknown → DRV8833). */
+	/** Default pins from ByByteConfig for the active platform. */
 	explicit MotorDriver(ControlMode mode = ControlMode::Direct);
+	/** Explicit pin bundle (defaults still used for any field left at 0). */
 	MotorDriver(const MotorPins& pins, ControlMode mode = ControlMode::Direct);
-
-	explicit MotorDriver(DriverType driver, ControlMode mode = ControlMode::Direct);
-	MotorDriver(DriverType driver, const MotorPins& pins, ControlMode mode = ControlMode::Direct);
-
-	~MotorDriver();
+	~MotorDriver() = default;
 
 	MotorDriver(const MotorDriver&) = delete;
 	MotorDriver& operator=(const MotorDriver&) = delete;
 
+	/** Driver selected for this build (for introspection / runtime branching). */
+	DriverType driverType() const noexcept;
+
+	/** Configure pins and bring the driver up. Returns false on invalid pins. */
 	bool begin();
 
+	/** Direct per-wheel PWM. Switches the instance to Direct mode. */
 	void setMotorSpeeds(int16_t left, int16_t right);
+
+	/** Differential command queue. Switches to Differential mode, applied on update(). */
 	void setTargetVelocity(const Twist& cmd);
 	void setTargetVelocity(float linearX, float angularZ);
 	void update();
 
+	// Convenience moves (Direct mode).
 	void forward(int16_t speed = 100);
 	void backward(int16_t speed = 100);
 	void left(int16_t speed = 100);
@@ -68,18 +64,22 @@ public:
 	void stop();
 
 private:
-	MotorController* _motor;
-	DifferentialDriveController* _diffDrive;
-	Twist _target;
-	ControlMode _mode;
-	DriverType _driverType;
+	// Declaration order matters: _backend depends on _pins, _diff on _backend.
 	MotorPins _pins;
+	ControlMode _mode;
+	Twist _target;
 
-	void resolveDefaults();
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	TB6612MotorController _backend;
+#else
+	DRV8833MotorController _backend;
+#endif
+
+	DifferentialDriveController _diff;
+	bool _begun;
+
 	bool resolvedPinsOk() const;
 	bool pwmPinsOk() const;
-	void createMotorController();
-	void ensureDifferential();
 };
 
 } // namespace ByByte

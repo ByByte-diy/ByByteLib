@@ -5,7 +5,7 @@
 
 namespace ByByte {
 
-/** Abstract brushed dual-motor backend (DRV8833/TB6612 implementations). */
+/** Abstract brushed dual-motor backend (DRV8833 / TB6612 implementations). */
 class MotorController {
 public:
 	MotorController() = default;

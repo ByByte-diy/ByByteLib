@@ -291,5 +291,5 @@ construct(pin) ──► begin() ──► tone(...) / patternXxx() (start) ─�
 |---|---|
 | `src/Buzzer.h` | Declares the class. |
 | `src/Buzzer.cpp` | Implements the class; holds the `PROGMEM` tone tables and the `readSeq()` flash/RAM reader. |
-| `src/configs/ByByteConfig.h` | Provides the `BYBYTE_HORN_PIN` default (`11` on Nano, `45` on Mega). |
-| `src/configs/PlatformDetect.h` | Selects the `BYBYTE_PLATFORM_ID` that `ByByteConfig.h` branches on. |
+| `src/core/configs/ByByteConfig.h` | Provides the `BYBYTE_HORN_PIN` default (`11` on Nano, `45` on Mega). |
+| `src/core/configs/PlatformDetect.h` | Selects the `BYBYTE_PLATFORM_ID` that `ByByteConfig.h` branches on. |

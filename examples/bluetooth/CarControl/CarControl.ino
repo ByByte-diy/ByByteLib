@@ -1,8 +1,9 @@
 /*
  * ByByteLib — Bluetooth Car Control (Mega / Nano)
  *
- * Kit wiring: ByByteMega (TB6612 + Serial1 BT) or ByByteNano (DRV8833 + SoftwareSerial BT).
- * Single-character commands over Bluetooth.default pins from configs/ByByteConfig.
+ * Wiring: ByByteMega (TB6612 + Serial1 BT) or ByByteNano (DRV8833 + SoftwareSerial BT).
+ * Driver/pins/BT pins auto-selected from the compiled platform (no kit class needed).
+ * Single-character commands over Bluetooth.
  *
  * Commands:
  *  F/B/L/R - forward/back/left/right
@@ -11,20 +12,24 @@
  *  W/w - front light on/off; U/u - back light on/off
  *  V/v - horn on/off; X/x - extra blinking pattern on/off
  *  1..9 -> speed 0..90%; q -> 100%
+ *
+ * Module-only usage:
+ * - Pulls in ByByteMotor + ByByteBluetooth + ByByteBuzzer (see platformio.ini).
+ * The buzzer is a set of free functions (no class/singleton).
  */
 
-#include <ByByteLib.h>
+#include <MotorDriver.h>
+#include <Bluetooth.h>
+#include <Buzzer.h>
 #include <Adafruit_NeoPixel.h>
 
 using namespace ByByte;
 
-#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
-ByByteMega robot;
-#else
-ByByteNano robot;
-#endif
+// Driver/pins/BT pins auto-selected from PlatformDetect + ByByteConfig.
+MotorDriver motors;
+Bluetooth bluetooth;
 
-// Pins from configs/ByByteConfig
+// Pins from ByByteConfig (via ByByteCore).
 static const uint8_t PIN_WS2812 = BYBYTE_WS2812_PIN;
 static const uint16_t NUM_WS2812 = BYBYTE_WS2812_COUNT;
 #if defined(BYBYTE_HEADLIGHT_LEFT_PIN)
@@ -38,7 +43,6 @@ static const uint8_t PIN_WHITE2 = BYBYTE_HEADLIGHT_RIGHT_PIN;
 static const uint8_t PIN_WHITE2 = 0;
 #endif
 static const uint8_t PIN_HORN = BYBYTE_HORN_PIN;
-static Buzzer buzzer;
 
 static inline void safePinMode(uint8_t pin, uint8_t mode) { if (pin) pinMode(pin, mode); }
 static inline void safeWrite(uint8_t pin, uint8_t val) { if (pin) digitalWrite(pin, val); }
@@ -102,27 +106,27 @@ static void handleCmd(char c) {
   if (c == 'w') { safeWrite(PIN_WHITE1, LOW);  safeWrite(PIN_WHITE2, LOW);  wsFront(false); return; }
   if (c == 'U') { wsBack(true); return; }
   if (c == 'u') { wsBack(false); return; }
-  if (c == 'V') { buzzer.patternCarHorn(2); return; }
-  if (c == 'v') { buzzer.noTone(); return; }
+  if (c == 'V') { buzzerPatternCarHorn(2); return; }
+  if (c == 'v') { buzzerNoTone(); return; }
   if (c == 'X') { wsExtraSetEnabled(true);  return; }
   if (c == 'x') { wsExtraSetEnabled(false); return; }
 
   // motion
   const int16_t s = (int16_t)((BYBYTE_MAX_PWM * (long)speedPct) / 100L);
   switch (c) {
-    case 'F': robot.motors.forward(s); break;
-    case 'B': robot.motors.backward(s); break;
-    case 'L': robot.motors.left(s); break;
-    case 'R': robot.motors.right(s); break;
-    case 'G': robot.motors.turnLeft(s); break;
-    case 'I': robot.motors.turnRight(s); break;
-    case 'H': robot.motors.turnLeft(s); break;
-    case 'J': robot.motors.turnRight(s); break;
-    case 'S': robot.motors.stop(); break;
+    case 'F': motors.forward(s); break;
+    case 'B': motors.backward(s); break;
+    case 'L': motors.left(s); break;
+    case 'R': motors.right(s); break;
+    case 'G': motors.turnLeft(s); break;
+    case 'I': motors.turnRight(s); break;
+    case 'H': motors.turnLeft(s); break;
+    case 'J': motors.turnRight(s); break;
+    case 'S': motors.stop(); break;
     case 'D':
-      robot.motors.stop();
+      motors.stop();
       safeWrite(PIN_WHITE1, LOW); safeWrite(PIN_WHITE2, LOW);
-      buzzer.noTone();
+      buzzerNoTone();
       wsFront(false); wsBack(false); wsExtraSetEnabled(false);
       break;
     default: break;
@@ -131,18 +135,18 @@ static void handleCmd(char c) {
 
 void setup() {
 	Serial.begin(9600);
-	robot.beginMotors();
-	robot.beginBluetooth(9600);
+	motors.begin();
+	bluetooth.begin(9600);
 	safePinMode(PIN_HORN, OUTPUT);
 	safePinMode(PIN_WHITE1, OUTPUT);
 	safePinMode(PIN_WHITE2, OUTPUT);
 	wsBegin();
-	buzzer.begin();
+	buzzerBegin();   // uses BYBYTE_HORN_PIN from config
 }
 
 void loop() {
-	(void)robot.bluetooth.isReady();
-	while (robot.bluetooth.available()) handleCmd((char)robot.bluetooth.read());
+	(void)bluetooth.isReady();
+	while (bluetooth.available()) handleCmd((char)bluetooth.read());
 	wsTickBlinkers();
-	buzzer.update();
+	buzzerUpdate();
 }

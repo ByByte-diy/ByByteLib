@@ -21,7 +21,7 @@ Distances are produced with the standard `cm = echo_us / 58` approximation
 > **Single-instance design:** `Sonar` uses a static self-pointer
 > (`instance()`) to route the TimerManager/PCINT static callbacks to the
 > active object. Only one `Sonar` is wired to the timers at a time. For
-> higher-precision, multi-instance sonar, see `SonarPrecise` (separate class).
+> higher-precision, multi-instance sonar, see [SonarPrecise](sonar-precise.md) (separate class).
 
 ---
 
@@ -83,7 +83,7 @@ Internally:
 > edge. On the Mega, PCINT dispatch is available but the implementation keeps
 > the same `onTick()` 1 ms slot active without a separate echo-edge handler
 > registered here — i.e. the Mega relies on the shared tick. `SonarPrecise`
-> provides higher-precision 1 µs + edge-detection on the Mega if needed.
+> provides higher-precision 1 µs + edge-detection on the Mega (see [sonar-precise.md](sonar-precise.md)).
 
 **Returns:** nothing. Call exactly once after construction.
 
@@ -229,7 +229,7 @@ construct(trig, echo, maxRangeCm) ──► begin() ─► readCm() (poll, repea
 | File | Role for `Sonar` |
 |---|---|
 | `src/Sonar.h` | Defines the class (header-only, all inline). |
-| `src/TimerManager.h` | Provides the 1 ms scheduler slot (`TimerInterval::MILLISECOND_1`) that drives the periodic trigger. |
-| `src/PcintManager.h` | Provides Pin Change Interrupt echo-edge subscription on the Nano. |
-| `src/configs/PlatformDetect.h` | Defines `BYBYTE_PLATFORM_ID` / `BYBYTE_PLATFORM_NANO` / `BYBYTE_PLATFORM_MEGA`, branched on in `begin()` / `end()`. |
+| `src/core/TimerManager.h` | Provides the 1 ms scheduler slot (`TimerInterval::MILLISECOND_1`) that drives the periodic trigger. |
+| `src/core/PcintManager.h` | Provides Pin Change Interrupt echo-edge subscription on the Nano. |
+| `src/core/configs/PlatformDetect.h` | Defines `BYBYTE_PLATFORM_ID` / `BYBYTE_PLATFORM_NANO` / `BYBYTE_PLATFORM_MEGA`, branched on in `begin()` / `end()`. |
 | `src/SonarPrecise.h` | Separate higher-precision, multi-instance alternative (up to 4 sonars, 1 µs slot). |

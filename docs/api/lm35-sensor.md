@@ -182,5 +182,5 @@ construct(adcPin) ──► begin() (optional no-op) ──► readCelsius() / r
 | File | Role for `Lm35Sensor` |
 |---|---|
 | `src/Lm35Sensor.h` | Defines the class (header-only, all inline). |
-| `src/configs/ByByteConfig.h` | Provides the `BYBYTE_TMP_ADC_PIN` default (`A1` on both Nano and Mega). |
-| `src/configs/PlatformDetect.h` | Selects the `BYBYTE_PLATFORM_ID` used by `ByByteConfig.h`; the read path keys off `__AVR_ATmega2560__` directly. |
+| `src/core/configs/ByByteConfig.h` | Provides the `BYBYTE_TMP_ADC_PIN` default (`A1` on both Nano and Mega). |
+| `src/core/configs/PlatformDetect.h` | Selects the `BYBYTE_PLATFORM_ID` used by `ByByteConfig.h`; the read path keys off `__AVR_ATmega2560__` directly. |

@@ -11,7 +11,7 @@ static inline int16_t clampPwm(int16_t value) {
 	return value;
 }
 
-// DRV8833-style: dual-PWM H-bridge on in1/in2
+// DRV8833-style: dual-PWM H-bridge on in1/in2.
 static inline void writeHBridgePwm(uint8_t in1, uint8_t in2, int16_t value) {
 	int16_t v = clampPwm(value);
 	if (v >= 0) {
@@ -23,7 +23,7 @@ static inline void writeHBridgePwm(uint8_t in1, uint8_t in2, int16_t value) {
 	}
 }
 
-// TB6612-style: DIR on in1/in2, PWM on pwmPin
+// TB6612-style: DIR on in1/in2, PWM on pwmPin.
 static inline void writeTb6612Channel(uint8_t in1, uint8_t in2, uint8_t pwmPin, int16_t value) {
 	int16_t v = clampPwm(value);
 	if (v >= 0) {

@@ -9,10 +9,10 @@
  * - Mega: pin 23, 4 LEDs (0-1 headlights, 2-3 tails)
  * - Nano: pin 7, 2 LEDs (0-1 headlights)
  *
- * Usage:
- * - Upload and move between bright/dark environments to see lights toggle
+ * Module-only usage:
+ * - Pulls in ByByteSensors + external NeoPixel lib.
  */
-#include <ByByteLib.h>
+#include <LdrSensor.h>
 #include <Adafruit_NeoPixel.h>
 
 using namespace ByByte;

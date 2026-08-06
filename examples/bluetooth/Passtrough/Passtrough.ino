@@ -8,8 +8,11 @@
  * Hardware:
  * - Mega: Serial1 + power pin D29 (auto handled)
  * - Nano: SoftwareSerial on D2(RX), D3(TX)
+ *
+ * Module-only usage:
+ * - Pulls in the ByByteBluetooth module alone (see platformio.ini).
  */
-#include <ByByteLib.h>
+#include <Bluetooth.h>
 
 using namespace ByByte;
 
@@ -42,9 +45,6 @@ void loop() {
 	// BT -> PC
 	while (bt.available()) {
 		int b = bt.read();
-
 		Serial.write((char)b);
 	}
 }
-
-

@@ -19,20 +19,34 @@
  * 8. Battery (voltage, SoC, charging)
  * 9. Temperature (LM35)
  * 10. Light sensor (LDR)
- * 11. IR receiver (remote codes)
- * 12. Sonar (distance)
- * 13. Tachometers (wheel speed)
- * 14. Shock sensor
- * 15. 12V power control
- * 16. Buzzer (R2D2 sound)
- * 17. Servo (0-180 degrees)
+ * 11. Sonar (distance)
+ * 12. Tachometers (wheel speed)
+ * 13. Shock sensor
+ * 14. 12V power control
+ * 15. Buzzer (R2D2 sound)
+ * 16. Servo (0-180 degrees)
  */
 
-#include <ByByteLib.h>
+// Comprehensive test of every Mega peripheral. Uses every ByByte module,
+// so each one is included directly and listed in lib_deps (see platformio.ini).
+// The buzzer is exposed as free functions (ByByteBuzzer module).
+
+#include <ByByteCore.h>
+#include <MotorDriver.h>
+#include <Bluetooth.h>
+#include <Buzzer.h>
+#include <BatterySensor.h>
+#include <Lm35Sensor.h>
+#include <LdrSensor.h>
+#include <SideIrSensors.h>
+#include <Servo.h>
+#include <SonarPrecise.h>
 #include <LiquidCrystal_I2C.h>
 #include <QTRSensors.h>
 #include <Adafruit_NeoPixel.h>
-#include <MPU6050.h>
+#include <MPU6050_tockn.h>
+
+using namespace ByByte;
 
 // Hardware
 static LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -58,7 +72,6 @@ enum TestType {
   TEST_BATTERY,
   TEST_TEMPERATURE,
   TEST_LIGHT,
-  TEST_IR_RECEIVER,
   TEST_SONAR,
   TEST_TACHOMETERS,
   TEST_SHOCK,
@@ -79,7 +92,6 @@ const char* testNames[] = {
   "Battery",
   "Temperature",
   "Light",
-  "IR Receiver",
   "Sonar",
   "Tachometers",
   "Shock",
@@ -104,14 +116,13 @@ bool power12v = false;
 unsigned long powerToggleTime = 0;
 
 // Objects
-ByByte::MotorDriver motors(DriverType::TB6612);
+// Driver/pins auto-selected for the compiled platform (Mega -> TB6612).
+ByByte::MotorDriver motors;
 ByByte::Bluetooth bt;
-ByByte::Buzzer buzzer;
 ByByte::BatterySensor battery;
 ByByte::Lm35Sensor temperature;
 ByByte::LdrSensor light;
 ByByte::SideIrSensors sideIr;
-ByByte::IrReceiver irReceiver;
 ByByte::Servo servo0;
 
 void setup() {
@@ -122,7 +133,7 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000);
   
-  lcd.begin();
+  lcd.init();
   lcd.backlight();
   lcd.clear();
   
@@ -134,12 +145,11 @@ void setup() {
   // Initialize other components
   motors.begin();
   bt.begin();
-  buzzer.begin();
+  buzzerBegin();  // free function (ByByteBuzzer module)
   battery.begin();
   temperature.begin();
   light.begin();
   sideIr.begin();
-  irReceiver.begin();
   servo0.attach(BYBYTE_SERVO0_PIN);
   
   // Initialize line sensors
@@ -285,7 +295,7 @@ void exitTest() {
   
   // Cleanup
   motors.stop();
-  buzzer.noTone();
+  buzzerNoTone();  // free function (ByByteBuzzer module)
   servo0.write(90);
   digitalWrite(BYBYTE_PWR12_EN_PIN, LOW);
   ws2812.clear();
@@ -319,7 +329,6 @@ void runCurrentTest() {
     case TEST_BATTERY: testBattery(); break;
     case TEST_TEMPERATURE: testTemperature(); break;
     case TEST_LIGHT: testLight(); break;
-    case TEST_IR_RECEIVER: testIrReceiver(); break;
     case TEST_SONAR: testSonar(); break;
     case TEST_TACHOMETERS: testTachometers(); break;
     case TEST_SHOCK: testShock(); break;
@@ -524,20 +533,6 @@ void testLight() {
   lcd.print(F("%)"));
 }
 
-void testIrReceiver() {
-  lcd.setCursor(0, 0);
-  lcd.print(F("IR Receiver"));
-  lcd.setCursor(0, 1);
-  
-  if (irReceiver.available()) {
-    ByByte::IrFrame frame = irReceiver.read();
-    lcd.print(F("Code: "));
-    lcd.print(frame.command, HEX);
-  } else {
-    lcd.print(F("Waiting..."));
-  }
-}
-
 // removed local sonarTick; using library Sonar with TimerManager
 
 void testSonar() {
@@ -626,7 +621,7 @@ void testBuzzer() {
   // Play R2D2 sound once
   static bool played = false;
   if (!played) {
-    buzzer.patternR2D2();
+    buzzerPatternR2D2();  // free function (ByByteBuzzer module)
     played = true;
   }
 }

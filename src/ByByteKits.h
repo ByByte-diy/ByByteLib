@@ -1,7 +1,7 @@
 #ifndef BYBYTE_KITS_H
 #define BYBYTE_KITS_H
 
-#include "configs/ByByteProduct.h"
+#include "core/configs/ByByteProduct.h"
 #include "Bluetooth.h"
 #include "MotorDriver.h"
 
@@ -13,7 +13,8 @@ public:
 	MotorDriver motors;
 	Bluetooth bluetooth;
 
-	ByByteNano() : motors(DriverType::DRV8833) {}
+	// Driver/pins are auto-selected by PlatformDetect for the compiled board.
+	ByByteNano() = default;
 
 	PlatformKit kit() const noexcept override {
 		return PlatformKit::Nano;
@@ -39,7 +40,8 @@ public:
 	MotorDriver motors;
 	Bluetooth bluetooth;
 
-	ByByteMega() : motors(DriverType::TB6612) {}
+	// Driver/pins are auto-selected by PlatformDetect for the compiled board.
+	ByByteMega() = default;
 
 	PlatformKit kit() const noexcept override {
 		return PlatformKit::Mega;

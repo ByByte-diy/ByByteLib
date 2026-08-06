@@ -1,146 +1,112 @@
 #include "MotorDriver.h"
 
-#include "configs/ByByteConfig.h"
-#include "PinCapabilities.h"
-#include "DRV8833MotorController.h"
-#include "TB6612MotorController.h"
+#include "core/ByByteCore.h"
+#include "core/PinCapabilities.h"
 
 namespace ByByte {
 
 namespace {
 
-/** Matches ByByteConfig wiring: TB6612 on Mega, DRV8833 on Nano (and unknown → DRV8833). */
-DriverType defaultDriverForBuildTarget() {
-	#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
-	return DriverType::TB6612;
-	#else
-	return DriverType::DRV8833;
-	#endif
+// True when the caller supplied explicit pins (any field non-zero).
+bool pinsProvided(const MotorPins& p) {
+	return p.leftIn1 || p.leftIn2 || p.rightIn1 || p.rightIn2 ||
+	       p.leftPwm || p.rightPwm || p.stby;
+}
+
+// Hardware defaults for the compiled platform (empty when unsupported).
+MotorPins platformDefaultPins() {
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_NANO
+	return MotorPins::drv8833(
+		BYBYTE_NANO_LEFT_IN1, BYBYTE_NANO_LEFT_IN2,
+		BYBYTE_NANO_RIGHT_IN1, BYBYTE_NANO_RIGHT_IN2);
+#elif BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	return MotorPins::tb6612(
+		BYBYTE_TB6612_LEFT_IN1, BYBYTE_TB6612_LEFT_IN2, BYBYTE_TB6612_LEFT_PWM,
+		BYBYTE_TB6612_RIGHT_IN1, BYBYTE_TB6612_RIGHT_IN2, BYBYTE_TB6612_RIGHT_PWM,
+		BYBYTE_TB6612_STBY);
+#else
+	return MotorPins{};
+#endif
+}
+
+// Use caller pins when at least one is set, otherwise fall back to platform defaults.
+MotorPins resolvePins(const MotorPins& given) {
+	return pinsProvided(given) ? given : platformDefaultPins();
 }
 
 } // namespace
 
 MotorDriver::MotorDriver(ControlMode mode)
-	: MotorDriver(defaultDriverForBuildTarget(), mode) {}
+	: _pins(resolvePins(MotorPins{})),
+	  _mode(mode),
+	  _target{},
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	  _backend(_pins.stby, _pins.leftIn1, _pins.leftIn2, _pins.leftPwm,
+	           _pins.rightIn1, _pins.rightIn2, _pins.rightPwm),
+#else
+	  _backend(_pins.leftIn1, _pins.leftIn2, _pins.rightIn1, _pins.rightIn2),
+#endif
+	  _diff(_backend, BYBYTE_WHEEL_SEPARATION_M, BYBYTE_WHEEL_RADIUS_M, BYBYTE_MAX_PWM),
+	  _begun(false) {}
 
 MotorDriver::MotorDriver(const MotorPins& pins, ControlMode mode)
-	: MotorDriver(defaultDriverForBuildTarget(), pins, mode) {}
-
-MotorDriver::MotorDriver(DriverType driver, ControlMode mode)
-	: _motor(nullptr),
-	  _diffDrive(nullptr),
+	: _pins(resolvePins(pins)),
 	  _mode(mode),
-	  _driverType(driver) {
-	_target.linearX = 0;
-	_target.angularZ = 0;
-}
+	  _target{},
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	  _backend(_pins.stby, _pins.leftIn1, _pins.leftIn2, _pins.leftPwm,
+	           _pins.rightIn1, _pins.rightIn2, _pins.rightPwm),
+#else
+	  _backend(_pins.leftIn1, _pins.leftIn2, _pins.rightIn1, _pins.rightIn2),
+#endif
+	  _diff(_backend, BYBYTE_WHEEL_SEPARATION_M, BYBYTE_WHEEL_RADIUS_M, BYBYTE_MAX_PWM),
+	  _begun(false) {}
 
-MotorDriver::MotorDriver(DriverType driver, const MotorPins& pins, ControlMode mode)
-	: _motor(nullptr),
-	  _diffDrive(nullptr),
-	  _mode(mode),
-	  _driverType(driver),
-	  _pins(pins) {
-	_target.linearX = 0;
-	_target.angularZ = 0;
-}
-
-MotorDriver::~MotorDriver() {
-	delete _diffDrive;
-	_diffDrive = nullptr;
-	delete _motor;
-	_motor = nullptr;
-}
-
-void MotorDriver::resolveDefaults() {
-	if (_driverType == DriverType::DRV8833) {
-		if (_pins.leftIn1 == 0 && _pins.leftIn2 == 0 && _pins.rightIn1 == 0 && _pins.rightIn2 == 0) {
-			#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_NANO
-			_pins = MotorPins::drv8833(
-				BYBYTE_NANO_LEFT_IN1,
-				BYBYTE_NANO_LEFT_IN2,
-				BYBYTE_NANO_RIGHT_IN1,
-				BYBYTE_NANO_RIGHT_IN2);
-			#endif
-		}
-	} else if (_driverType == DriverType::TB6612) {
-		if (_pins.leftPwm == 0 && _pins.rightPwm == 0 && _pins.leftIn1 == 0 && _pins.leftIn2 == 0 && _pins.rightIn1 == 0 &&
-			_pins.rightIn2 == 0) {
-			#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
-			_pins = MotorPins::tb6612(
-				BYBYTE_TB6612_LEFT_IN1,
-				BYBYTE_TB6612_LEFT_IN2,
-				BYBYTE_TB6612_LEFT_PWM,
-				BYBYTE_TB6612_RIGHT_IN1,
-				BYBYTE_TB6612_RIGHT_IN2,
-				BYBYTE_TB6612_RIGHT_PWM,
-				BYBYTE_TB6612_STBY);
-			#endif
-		}
-	}
+DriverType MotorDriver::driverType() const noexcept {
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	return DriverType::TB6612;
+#else
+	return DriverType::DRV8833;
+#endif
 }
 
 bool MotorDriver::resolvedPinsOk() const {
-	if (_driverType == DriverType::DRV8833) {
-		return _pins.leftIn1 != 0 && _pins.leftIn2 != 0 && _pins.rightIn1 != 0 && _pins.rightIn2 != 0;
-	}
-	return _pins.stby != 0 && _pins.leftIn1 != 0 && _pins.leftIn2 != 0 &&
-		   _pins.leftPwm != 0 && _pins.rightIn1 != 0 && _pins.rightIn2 != 0 && _pins.rightPwm != 0;
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+	return _pins.stby != 0 &&
+	       _pins.leftIn1 != 0 && _pins.leftIn2 != 0 && _pins.leftPwm != 0 &&
+	       _pins.rightIn1 != 0 && _pins.rightIn2 != 0 && _pins.rightPwm != 0;
+#else
+	return _pins.leftIn1 != 0 && _pins.leftIn2 != 0 &&
+	       _pins.rightIn1 != 0 && _pins.rightIn2 != 0;
+#endif
 }
 
 bool MotorDriver::pwmPinsOk() const {
-	#if defined(ARDUINO)
-	if (_driverType == DriverType::DRV8833) {
-		return isPwmPin(_pins.leftIn1) && isPwmPin(_pins.leftIn2) &&
-			   isPwmPin(_pins.rightIn1) && isPwmPin(_pins.rightIn2);
-	}
+#if defined(ARDUINO)
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
 	return isPwmPin(_pins.leftPwm) && isPwmPin(_pins.rightPwm);
-	#else
+#else
+	return isPwmPin(_pins.leftIn1) && isPwmPin(_pins.leftIn2) &&
+	       isPwmPin(_pins.rightIn1) && isPwmPin(_pins.rightIn2);
+#endif
+#else
 	return true;
-	#endif
+#endif
 }
 
 bool MotorDriver::begin() {
-	resolveDefaults();
+	if (_begun) return true;
 	if (!resolvedPinsOk()) return false;
 	if (!pwmPinsOk()) return false;
-	createMotorController();
-	if (!_motor) return false;
-	return _motor->begin();
-}
-
-void MotorDriver::createMotorController() {
-	if (_driverType == DriverType::DRV8833) {
-		_motor = new DRV8833MotorController(
-			_pins.leftIn1, 
-			_pins.leftIn2, 
-			_pins.rightIn1, 
-			_pins.rightIn2);
-	} else if (_driverType == DriverType::TB6612) {
-		_motor = new TB6612MotorController(
-			_pins.stby,
-			_pins.leftIn1,
-			_pins.leftIn2,
-			_pins.leftPwm,
-			_pins.rightIn1,
-			_pins.rightIn2,
-			_pins.rightPwm);
-	}
-}
-
-void MotorDriver::ensureDifferential() {
-	if (_mode == ControlMode::Differential && !_diffDrive && _motor) {
-		_diffDrive = new DifferentialDriveController(
-			*_motor,
-			BYBYTE_WHEEL_SEPARATION_M,
-			BYBYTE_WHEEL_RADIUS_M,
-			BYBYTE_MAX_PWM);
-	}
+	if (!_backend.begin()) return false;
+	_begun = true;
+	return true;
 }
 
 void MotorDriver::setMotorSpeeds(int16_t left, int16_t right) {
 	_mode = ControlMode::Direct;
-	if (_motor) _motor->setMotorSpeeds(left, right);
+	if (!_begun) return;
+	_backend.setMotorSpeeds(left, right);
 }
 
 void MotorDriver::setTargetVelocity(const Twist& cmd) {
@@ -156,10 +122,10 @@ void MotorDriver::setTargetVelocity(float linearX, float angularZ) {
 }
 
 void MotorDriver::update() {
-	ensureDifferential();
-	if (_mode == ControlMode::Differential && _diffDrive) {
-		_diffDrive->setTargetVelocity(_target);
-		_diffDrive->update();
+	if (!_begun) return;
+	if (_mode == ControlMode::Differential) {
+		_diff.setTargetVelocity(_target);
+		_diff.update();
 	}
 }
 

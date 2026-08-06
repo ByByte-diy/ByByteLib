@@ -251,5 +251,5 @@ construct(adcPin, vrefMv, chrgPin) ──► begin() ──► readVoltage() / i
 | File | Role for `BatterySensor` |
 |---|---|
 | `src/BatterySensor.h` | Defines the class (header-only, all inline). |
-| `src/configs/ByByteConfig.h` | Provides `BYBYTE_BAT_ADC_PIN`, `BYBYTE_BAT_VREF_MV`, `BYBYTE_CHRG_PIN` defaults per platform (Mega real wiring; Nano stub). |
-| `src/configs/PlatformDetect.h` | Selects the `BYBYTE_PLATFORM_ID` (NANO / MEGA) that `ByByteConfig.h` branches on. |
+| `src/core/configs/ByByteConfig.h` | Provides `BYBYTE_BAT_ADC_PIN`, `BYBYTE_BAT_VREF_MV`, `BYBYTE_CHRG_PIN` defaults per platform (Mega real wiring; Nano stub). |
+| `src/core/configs/PlatformDetect.h` | Selects the `BYBYTE_PLATFORM_ID` (NANO / MEGA) that `ByByteConfig.h` branches on. |

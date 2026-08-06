@@ -2,7 +2,7 @@
 #define BYBYTE_SIDE_IR_SENSORS_H
 
 #include <Arduino.h>
-#include "configs/ByByteConfig.h"
+#include "core/ByByteCore.h"
 
 namespace ByByte {
 

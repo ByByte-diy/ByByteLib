@@ -42,6 +42,9 @@ namespace ByByte {
 	void (*PcintManager::_handlers0[8])() = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 	void (*PcintManager::_handlers1[8])() = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 	void (*PcintManager::_handlers2[8])() = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+	void (*PcintManager::_portHook0)(uint8_t) = nullptr;
+	void (*PcintManager::_portHook1)(uint8_t) = nullptr;
+	void (*PcintManager::_portHook2)(uint8_t) = nullptr;
 	uint8_t PcintManager::_last0 = 0;
 	uint8_t PcintManager::_last1 = 0;
 	uint8_t PcintManager::_last2 = 0;
@@ -125,6 +128,16 @@ namespace ByByte {
 		return true;
 	}
 
+	bool PcintManager::subscribePin(uint8_t arduinoPin, void (*handler)(), bool enablePullup) {
+		// Arduino-core pin map: PCIE bit index (group 0..2) and mask bit (bit 0..7).
+		volatile uint8_t* pcmsk = digitalPinToPCMSK(arduinoPin);
+		if (!pcmsk) return false;                 // not PCINT-capable
+		uint8_t groupIdx = digitalPinToPCICRbit(arduinoPin); // 0..2
+		uint8_t bitIdx   = digitalPinToPCMSKbit(arduinoPin);  // 0..7
+		uint8_t pcintNumber = (uint8_t)(groupIdx * 8 + bitIdx);
+		return subscribe(pcintNumber, handler, enablePullup);
+	}
+
 	void PcintManager::unsubscribe(uint8_t pcintNumber) {
 		uint8_t groupIdx, bitIdx;
 		if (!mapToGroupAndBit(pcintNumber, groupIdx, bitIdx)) return;
@@ -135,32 +148,49 @@ namespace ByByte {
 	}
 
 	void PcintManager::handleGroup0(uint8_t changedMask, uint8_t current) {
+		if (_portHook0) _portHook0(current);   // e.g. NeoSWSerial::rxISR(PINB/PINJ)
 		for (uint8_t i = 0; i < 8; ++i) if (changedMask & (1 << i)) { if (_handlers0[i]) _handlers0[i](); }
 		_last0 = current;
 	}
 
 	void PcintManager::handleGroup1(uint8_t changedMask, uint8_t current) {
+		if (_portHook1) _portHook1(current);
 		for (uint8_t i = 0; i < 8; ++i) if (changedMask & (1 << i)) { if (_handlers1[i]) _handlers1[i](); }
 		_last1 = current;
 	}
 
 	void PcintManager::handleGroup2(uint8_t changedMask, uint8_t current) {
+		if (_portHook2) _portHook2(current);
 		for (uint8_t i = 0; i < 8; ++i) if (changedMask & (1 << i)) { if (_handlers2[i]) _handlers2[i](); }
 		_last2 = current;
+	}
+
+	void PcintManager::setPortHook(uint8_t groupIdx, void (*handler)(uint8_t)) {
+		cli();
+		if (groupIdx == 0) _portHook0 = handler;
+		else if (groupIdx == 1) _portHook1 = handler;
+		else if (groupIdx == 2) _portHook2 = handler;
+		sei();
+	}
+
+	void PcintManager::clearPortHook(uint8_t groupIdx) {
+		setPortHook(groupIdx, nullptr);
 	}
 
 } // namespace ByByte
 
 // PCINT vector ownership:
-//   - On the ATmega2560, ByByteLib's PcintManager OWNS the Pin Change Interrupt
-//     vectors (SoftwareSerial is never linked there -- Bluetooth uses Serial1).
-//   - On ATmega328P/168 (Nano), the stock SoftwareSerial library owns the
-//     PCINT0/1/2 vectors (and aliases them). It is unconditionally linked on
-//     the Nano because Bluetooth.cpp uses SoftwareSerial. Defining the same
-//     ISRs here would cause "multiple definition of __vector_3/4/5". So on the
-//     328P we keep PcintManager's class methods (subscribe/configure/.../*) but
-//     do NOT emit the vector bodies; SoftwareSerial owns dispatch there.
-#if defined(__AVR_ATmega2560__)
+//   PcintManager is the single owner of the Pin Change Interrupt vectors on
+//   every supported AVR board (ATmega2560 and ATmega328P/168). Bluetooth on the
+//   Nano uses NeoSWSerial compiled with NEOSWSERIAL_EXTERNAL_PCINT, so it does
+//   NOT emit any ISR(PCINTx_vect) and instead receives byte edges through
+//   PcintManager's per-group raw-port hook (setPortHook -> NeoSWSerial::rxISR).
+//   The classic SoftwareSerial library is no longer linked anywhere, so there
+//   is no vector clash.
+//
+//   Opt out (e.g. if a third party links its own PCINT ISRs) by defining
+//   BYBYTE_DISABLE_PCINT_VECTORS before this TU is compiled.
+#if !defined(BYBYTE_DISABLE_PCINT_VECTORS)
 
 ISR(PCINT0_vect) {
 	using namespace ByByte;
@@ -189,6 +219,6 @@ ISR(PCINT2_vect) {
 	last = cur;
 }
 
-#endif // __AVR_ATmega2560__
+#endif // !BYBYTE_DISABLE_PCINT_VECTORS
 
 #endif // supported boards

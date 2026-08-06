@@ -2,14 +2,12 @@
 #define BYBYTE_BLUETOOTH_H
 
 #include <Arduino.h>
-#include "configs/ByByteConfig.h"
+#include "core/ByByteCore.h"
 
 #if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
-#include "configs/BbPinsByByteMega.h"
 #else
-#include "configs/BbPinsByByteNano.h"
 // Pointer member only; full type in Bluetooth.cpp so headers stay parseable without Arduino library paths.
-class SoftwareSerial;
+class NeoSWSerial;
 #endif
 
 namespace ByByte {
@@ -77,7 +75,7 @@ private:
 	uint8_t _powerPin;
 #else
 	bb::pins::by_byte_nano::BtSoftwareSerialPins _pins;
-	SoftwareSerial* _uart; // heap-allocated in ctor; see ~Bluetooth() in .cpp
+	NeoSWSerial* _uart; // heap-allocated in ctor; see ~Bluetooth() in .cpp
 #endif
 	uint32_t _baud;
 	BtModuleType _type;

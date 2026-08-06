@@ -43,10 +43,6 @@
 #ifndef BYBYTE_IR_POWER_PIN
 #define BYBYTE_IR_POWER_PIN 4
 #endif
-// IR remote receiver (default PCINT-capable): D8
-#ifndef BYBYTE_IR_RX_PIN
-#define BYBYTE_IR_RX_PIN 8
-#endif
 // LDR sensor (mandatory on Nano)
 #ifndef BYBYTE_LDR_ADC_PIN
 #define BYBYTE_LDR_ADC_PIN A5
@@ -159,10 +155,6 @@
 #endif
 #ifndef BYBYTE_IR_POWER_PIN
 #define BYBYTE_IR_POWER_PIN 22
-#endif
-// IR remote receiver: PJ1 -> Arduino digital 14 (PCINT10)
-#ifndef BYBYTE_IR_RX_PIN
-#define BYBYTE_IR_RX_PIN 14
 #endif
 // Servo pins mapping: D30/D31/D32
 #ifndef BYBYTE_SERVO0_PIN
