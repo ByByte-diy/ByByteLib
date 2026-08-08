@@ -5,7 +5,7 @@
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-compatible-orange.svg)](https://platformio.org/)
 [![Platform: AVR](https://img.shields.io/badge/Platform-AVR-1C6EA4.svg)](https://docs.platformio.org/en/latest/platforms/atmelavr.html)
 [![Language: C++](https://img.shields.io/badge/Language-C%2B%2B-00599C.svg)](https://isocpp.org/)
-[![Version](https://img.shields.io/badge/version-0.2.0-green.svg)](library.json)
+[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](library.json)
 
 Minimal, extensible robotics API for Arduino and PlatformIO.
 
