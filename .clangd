@@ -1,0 +1,3 @@
+# Use PlatformIO-emitted compilation database so clangd gets Arduino cores + libraries (e.g. SoftwareSerial).
+# Regenerate root compile_commands.json: pio run -e nano -t compiledb
+CompilationDatabase: .

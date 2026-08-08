@@ -1,0 +1,16 @@
+ByByteLib	KEYWORD1
+ByByteNano	KEYWORD1
+ByByteMega	KEYWORD1
+ByByteNanoBoy	KEYWORD1
+ByByteKit	KEYWORD1
+PlatformKit	KEYWORD1
+RobotPlatform	KEYWORD1
+MotorController	KEYWORD1
+DifferentialDriveController	KEYWORD1
+Sensor	KEYWORD1
+begin	KEYWORD2
+update	KEYWORD2
+setTargetVelocity	KEYWORD2
+setMotorSpeeds	KEYWORD2
+
+
