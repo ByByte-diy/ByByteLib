@@ -2,110 +2,161 @@
 #define BYBYTE_SONAR_H
 
 #include <Arduino.h>
-#include "core/TimerManager.h"
 #include "core/ByByteCore.h"
 #include "core/PcintManager.h"
 
 namespace ByByte {
 
-class Sonar {
-public:
-	Sonar(uint8_t trigPin, uint8_t echoPin, uint16_t maxRangeCm = 400)
-		: _trig(trigPin), _echo(echoPin), _maxCm(maxRangeCm), _state(Idle),
-		  _lastCm(0), _riseUs(0), _startUs(0), _lastPingMs(0) {}
+	class Sonar {
+	public:
+		Sonar()
+			: Sonar(BYBYTE_SONAR_TRIG_PIN, BYBYTE_SONAR_ECHO_PIN, BYBYTE_SONAR_MAX_CM) {}
 
-	void begin() {
-		pinMode(_trig, OUTPUT);
-		pinMode(_echo, INPUT);
-		digitalWrite(_trig, LOW);
-		instance(this);
-		#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
-		// Use 1ms scheduler on Mega as well (disable Timer1 ISR to avoid conflicts)
-		TimerManager::getInstance().subscribe(TimerInterval::MILLISECOND_1, &Sonar::onTickStatic, false);
-		#elif BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_NANO
-		// Subscribe to PCINT for echo pin edges
-		PcintManager::subscribe(_echo, &Sonar::onPcintStatic);
-		// Periodic trigger via TimerManager 1ms (lightweight)
-		TimerManager::getInstance().subscribe(TimerInterval::MILLISECOND_1, &Sonar::onTickStatic, false);
-		#endif
-	}
+		Sonar(uint8_t trigPin, uint8_t echoPin)
+			: Sonar(trigPin, echoPin, BYBYTE_SONAR_MAX_CM) {}
 
-	void end() {
-		#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
-		TimerManager::getInstance().unsubscribe(&Sonar::onTickStatic);
-		#elif BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_NANO
-		TimerManager::getInstance().unsubscribe(&Sonar::onTickStatic);
-		PcintManager::unsubscribe(_echo);
-		#endif
-	}
+		Sonar(uint8_t trigPin, uint8_t echoPin, uint16_t maxRangeCm)
+			: _trig(trigPin), _echo(echoPin), _maxCm(maxRangeCm), _state(Idle),
+			_lastCm(0), _riseUs(0), _triggerStartedUs(0), _lastPingMs(0), _pcintNumber(0xFF) {}
 
-	// Returns last measured distance in cm (0 means out-of-range/timeout)
-	uint16_t readCm() const { return _lastCm; }
+		void begin() {
+			pinMode(_trig, OUTPUT);
+			pinMode(_echo, INPUT);
+			digitalWrite(_trig, LOW);
+			_lastCm = 0;
+			_state = Idle;
+			_riseUs = 0;
+			_triggerStartedUs = 0;
+			_lastPingMs = 0;
+			instance(this);
 
-private:
-	enum State { Idle, WaitHigh, Measuring };
+			#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+			// Mega uses a direct pulseIn-based measurement because its sonar pins are not on PCINT-capable ports.
+			#else
+			_pcintNumber = resolvePcintNumber(_echo);
+			if (_pcintNumber != 0xFF) {
+				PcintManager::subscribePin(_echo, &Sonar::onPcintStatic, false);
+			}
+			#endif
+		}
 
-	static void onTickStatic() { if (instance()) instance()->onTick(); }
-	static void onPcintStatic() { if (instance()) instance()->onPcint(); }
+		void end() {
+			#if BYBYTE_PLATFORM_ID != BYBYTE_PLATFORM_MEGA
+			if (_pcintNumber != 0xFF) {
+				PcintManager::unsubscribe(_pcintNumber);
+			}
+			#endif
+		}
 
-	static Sonar* instance(Sonar* set = nullptr) {
-		static Sonar* self = nullptr;
-		if (set) self = set;
-		return self;
-	}
+		// Returns last measured distance in cm (0 means out-of-range/timeout)
+		uint16_t readCm() {
+			#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+			unsigned long nowMs = millis();
+			if ((nowMs - _lastPingMs) >= 70UL) {
+				trigger();
+				unsigned long echoUs = pulseIn(_echo, HIGH, 30000UL);
+				if (echoUs > 0) {
+					unsigned int cm = (unsigned int)(echoUs / 58UL);
+					_lastCm = (cm > _maxCm) ? 0 : cm;
+				} else {
+					_lastCm = 0;
+				}
+				_lastPingMs = nowMs;
+				_state = Idle;
+			}
+			return _lastCm;
+			#else
+			if (_state == Idle) {
+				unsigned long nowMs = millis();
+				if ((nowMs - _lastPingMs) >= 70UL) {
+					trigger();
+				}
+			} else {
+				checkTimeout();
+			}
+			return _lastCm;
+			#endif
+		}
 
-	// Common 1ms scheduler (used for Nano TRIG, also safe for Mega)
-	void onTick() {
-		unsigned long nowMs = millis();
-		if (_state == Idle && (nowMs - _lastPingMs >= 100)) {
-			// Send 10us trigger pulse
+	private:
+		enum State { Idle, WaitHigh, Measuring };
+
+		static void onPcintStatic() { if (instance()) instance()->onPcint(); }
+
+		static Sonar* instance(Sonar* set = nullptr) {
+			static Sonar* self = nullptr;
+			if (set) self = set;
+			return self;
+		}
+
+		static uint8_t resolvePcintNumber(uint8_t pin) {
+			volatile uint8_t* pcmsk = digitalPinToPCMSK(pin);
+			if (!pcmsk) {
+				return 0xFF;
+			}
+			uint8_t group = digitalPinToPCICRbit(pin);
+			uint8_t bit = digitalPinToPCMSKbit(pin);
+			return static_cast<uint8_t>(group * 8 + bit);
+		}
+
+		void trigger() {
+			digitalWrite(_trig, LOW);
+			delayMicroseconds(2);
 			digitalWrite(_trig, HIGH);
 			delayMicroseconds(10);
 			digitalWrite(_trig, LOW);
-			_startUs = micros();
-			_lastPingMs = nowMs;
+			_triggerStartedUs = micros();
+			_lastPingMs = millis();
 			_state = WaitHigh;
 		}
-	}
 
-	// Nano: edge detection via PCINT
-	void onPcint() {
-		if (_state == Idle) return; // ignore stray
-		uint8_t level = digitalRead(_echo);
-		unsigned long nowUs = micros();
-		if (_state == WaitHigh && level == HIGH) {
-			_riseUs = nowUs;
-			_state = Measuring;
-			return;
+		void checkTimeout() {
+			unsigned long nowUs = micros();
+			if (_state == WaitHigh && (nowUs - _triggerStartedUs) > 30000UL) {
+				_lastCm = 0;
+				_state = Idle;
+			} else if (_state == Measuring && (nowUs - _riseUs) > 30000UL) {
+				_lastCm = 0;
+				_state = Idle;
+			}
 		}
-		if (_state == Measuring && level == LOW) {
-			unsigned long durUs = nowUs - _riseUs;
-			unsigned int cm = (unsigned int)(durUs / 58UL);
-			_lastCm = (cm > _maxCm) ? 0 : cm;
-			_state = Idle;
+
+		void onPcint() {
+			if (_state == Idle) return;
+			uint8_t level = digitalRead(_echo);
+			unsigned long nowUs = micros();
+			if (_state == WaitHigh && level == HIGH) {
+				_riseUs = nowUs;
+				_state = Measuring;
+				return;
+			}
+			if (_state == Measuring && level == LOW) {
+				unsigned long durUs = nowUs - _riseUs;
+				unsigned int cm = (unsigned int)(durUs / 58UL);
+				_lastCm = (cm > _maxCm) ? 0 : cm;
+				_state = Idle;
+			}
 		}
-	}
 
-	// Timer1 polling implementation removed to avoid ISR conflicts
+	private:
+		uint8_t _trig;
+		uint8_t _echo;
+		uint16_t _maxCm;
+		volatile State _state;
+		volatile uint16_t _lastCm;
+		volatile unsigned long _riseUs;
+		volatile unsigned long _triggerStartedUs;
+		volatile unsigned long _lastPingMs;
+		volatile uint8_t _pcintNumber;
 
-private:
-	uint8_t _trig;
-	uint8_t _echo;
-	uint16_t _maxCm;
-	volatile State _state;
-	volatile uint16_t _lastCm;
-	volatile unsigned long _riseUs;
-	volatile unsigned long _startUs;
-	volatile unsigned long _lastPingMs;
-
-public:
-	// Factory to register instance for static tick
-	static Sonar* create(uint8_t trigPin, uint8_t echoPin, uint16_t maxRangeCm = 400) {
-		Sonar* s = new Sonar(trigPin, echoPin, maxRangeCm);
-		instance(s);
-		return s;
-	}
-};
+	public:
+		// Factory to register instance for static tick
+		static Sonar* create(uint8_t trigPin, uint8_t echoPin, uint16_t maxRangeCm = 400) {
+			Sonar* s = new Sonar(trigPin, echoPin, maxRangeCm);
+			instance(s);
+			return s;
+		}
+	};
 
 } // namespace ByByte
 

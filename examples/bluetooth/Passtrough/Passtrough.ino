@@ -22,8 +22,10 @@ void setup() {
 	Serial.begin(9600);
 	Serial.println(F("=== Bluetooth Basic ==="));
 	Serial.println(F("Starting BT module..."));
-	bt.begin(9600);
-	Serial.println(F("Type 'r' to reset, 'n' to rename, any other to echo."));
+	while (!bt.begin(9600)) {
+		Serial.println(F("Failed to initialize BT module."));
+		delay(1000);
+	}
 }
 
 void loop() {

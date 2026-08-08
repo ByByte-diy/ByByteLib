@@ -20,8 +20,9 @@ Distances are produced with the standard `cm = echo_us / 58` approximation
 
 > **Single-instance design:** `Sonar` uses a static self-pointer
 > (`instance()`) to route the TimerManager/PCINT static callbacks to the
-> active object. Only one `Sonar` is wired to the timers at a time. For
-> higher-precision, multi-instance sonar, see [SonarPrecise](sonar-precise.md) (separate class).
+> active object. Only one `Sonar` is wired to the timers at a time; keep the
+> sensor lifecycle simple by calling `begin()` / `end()` around the active
+> instance when you need to switch between measurements.
 
 ---
 
@@ -80,10 +81,9 @@ Internally:
 
 > **Echo capture path:** On the Nano, ECHO rising/falling edges are captured
 > asynchronously via PCINT, yielding accurate `micros()` timestamps at the
-> edge. On the Mega, PCINT dispatch is available but the implementation keeps
-> the same `onTick()` 1 ms slot active without a separate echo-edge handler
-> registered here — i.e. the Mega relies on the shared tick. `SonarPrecise`
-> provides higher-precision 1 µs + edge-detection on the Mega (see [sonar-precise.md](sonar-precise.md)).
+> edge. On the Mega, the implementation keeps the same `onTick()` 1 ms slot
+> active and uses the shared timer-driven measurement path as the default
+> public API for ultrasonic ranging.
 
 **Returns:** nothing. Call exactly once after construction.
 
@@ -170,9 +170,8 @@ begin() ──► (every ~100 ms, in TimerManager 1ms slot)
 - **Mega (`BYBYTE_PLATFORM_MEGA`)** — TRIG from the 1 ms TimerManager slot;
   PCINT **not** subscribed in `begin()` (the design avoids Timer1 ISR
   conflicts). ECHO timing is therefore driven by the same 1 ms tick rather
-  than edge-precise capture; for sub-ms precision on the Mega, use
-  `SonarPrecise` (1 µs slot + edge detection), which is a separate class and
-  supports up to 4 instances.
+  than edge-precise capture; `Sonar` remains the default public API for the
+  standard HC-SR04-style measurement flow on the Mega.
 - **Unknown platform** — `begin()` / `end()` perform pin setup and
   registration but subscribe to **no** timers (both subscription blocks are
   platform-guarded), so the sensor will not produce autonomous readings. Wire
@@ -206,14 +205,14 @@ construct(trig, echo, maxRangeCm) ──► begin() ─► readCm() (poll, repea
 - **Sentinel:** treat `0` as *no reading* (out of range, timeout, or before
   the first measurement completes). Do not interpret a literal 0 cm.
 - **Single active instance:** the static `instance()` pointer means at most
-  one `Sonar` at a time is wired to the TimerManager/PCINT callbacks. For
-  multiple sonars, prefer `SonarPrecise` (up to 4 instances) or rotate by
-  `end()` / `begin()` between sensors.
+  one `Sonar` at a time is wired to the TimerManager/PCINT callbacks. If you
+  need to switch between sensors, rotate by `end()` / `begin()` between them.
 - **Nano echo pin must be PCINT-capable:** `PcintManager::subscribe()` is
   called with the Arduino `echoPin` and requires its underlying PCINT number
   to exist in the manager's pin map.
 - **Mega precision:** ECHO is not edge-captured here; the 1 ms tick limits
-  resolution. Use `SonarPrecise` for 1 µs edge-precise ranging on the Mega.
+  resolution. `Sonar` remains the default public API for standard ranging on
+  the Mega.
 - **ISR context:** `onTick()`/`onPcint()` run from ISR/TimerManager context
   (callbacks marked `immediately=false`, so 1 ms slot is dispatched from the
   timer ISR). Keep `readCm()` reads tolerant of the value updating between
@@ -228,8 +227,7 @@ construct(trig, echo, maxRangeCm) ──► begin() ─► readCm() (poll, repea
 
 | File | Role for `Sonar` |
 |---|---|
-| `src/Sonar.h` | Defines the class (header-only, all inline). |
+| `src/Sonar.h` | Defines the current public sonar API used by the library examples. |
 | `src/core/TimerManager.h` | Provides the 1 ms scheduler slot (`TimerInterval::MILLISECOND_1`) that drives the periodic trigger. |
 | `src/core/PcintManager.h` | Provides Pin Change Interrupt echo-edge subscription on the Nano. |
 | `src/core/configs/PlatformDetect.h` | Defines `BYBYTE_PLATFORM_ID` / `BYBYTE_PLATFORM_NANO` / `BYBYTE_PLATFORM_MEGA`, branched on in `begin()` / `end()`. |
-| `src/SonarPrecise.h` | Separate higher-precision, multi-instance alternative (up to 4 sonars, 1 µs slot). |

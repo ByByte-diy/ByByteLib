@@ -14,13 +14,12 @@
  *   since ByByteServo provides the same <Servo.h> header (class ByByte::Servo).
  */
 #include <ByByteLib.h>
+#include <Servo.h>
 
-using namespace ByByte;
-
-Servo s0, s1;
+ByByte::Servo s0, s1;
 
 void setup() {
-	Serial.begin(115200);
+	Serial.begin(9600);
 	if (!s0.attach(BYBYTE_SERVO0_PIN)) {
 		Serial.println(F("Failed to attach servo 0"));
 	}

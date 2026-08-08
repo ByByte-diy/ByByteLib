@@ -78,6 +78,16 @@
 #ifndef BYBYTE_HORN_PIN
 #define BYBYTE_HORN_PIN 11
 #endif
+// Sonar (Nano): TRIG D13, ECHO D12
+#ifndef BYBYTE_SONAR_TRIG_PIN
+#define BYBYTE_SONAR_TRIG_PIN 13
+#endif
+#ifndef BYBYTE_SONAR_ECHO_PIN
+#define BYBYTE_SONAR_ECHO_PIN 12
+#endif
+#ifndef BYBYTE_SONAR_MAX_CM
+#define BYBYTE_SONAR_MAX_CM 400
+#endif
 // Line sensors (Nano): 5 digital sensors on A0..A4
 #ifndef BYBYTE_LINE_COUNT
 #define BYBYTE_LINE_COUNT 5
@@ -235,6 +245,16 @@
 // Horn (Mega)
 #ifndef BYBYTE_HORN_PIN
 #define BYBYTE_HORN_PIN 45
+#endif
+// Sonar (Mega): TRIG D25, ECHO D24
+#ifndef BYBYTE_SONAR_TRIG_PIN
+#define BYBYTE_SONAR_TRIG_PIN 25
+#endif
+#ifndef BYBYTE_SONAR_ECHO_PIN
+#define BYBYTE_SONAR_ECHO_PIN 24
+#endif
+#ifndef BYBYTE_SONAR_MAX_CM
+#define BYBYTE_SONAR_MAX_CM 400
 #endif
 // User input buttons (active LOW)
 #ifndef BYBYTE_BTN1_PIN

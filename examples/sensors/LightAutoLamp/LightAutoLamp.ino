@@ -29,7 +29,7 @@ Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 LdrSensor ldr(BYBYTE_LDR_ADC_PIN, true); // invert if needed
 
 void setup() {
-	Serial.begin(115200);
+	Serial.begin(9600);
 	strip.begin();
 	strip.show();
 	ldr.begin();
@@ -37,14 +37,14 @@ void setup() {
 }
 
 void setHeadlights(bool on) {
-	uint32_t front = on ? strip.Color(255,255,200) : strip.Color(0,0,0);
-	uint32_t tail = on ? strip.Color(80,0,0) : strip.Color(0,0,0);
+	uint32_t front = on ? strip.Color(255, 255, 200) : strip.Color(0, 0, 0);
+	uint32_t tail = on ? strip.Color(80, 0, 0) : strip.Color(0, 0, 0);
 	strip.setPixelColor(0, front);
 	strip.setPixelColor(1, front);
-	#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
+#if BYBYTE_PLATFORM_ID == BYBYTE_PLATFORM_MEGA
 	strip.setPixelColor(2, tail);
 	strip.setPixelColor(3, tail);
-	#endif
+#endif
 	strip.show();
 }
 

@@ -18,14 +18,13 @@
 #include "Bluetooth.h"
 #include "Buzzer.h"
 #include "Sonar.h"
-#include "SonarPrecise.h"
 
 namespace ByByte {
 
-class ByByteLib {
-public:
-	static const char* version();
-};
+	class ByByteLib {
+	public:
+		static const char* version();
+	};
 
 } // namespace ByByte
 

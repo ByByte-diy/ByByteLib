@@ -14,10 +14,11 @@ namespace ByByte {
 			if (_chrgPin != 0xFF) pinMode(_chrgPin, INPUT_PULLUP);
 		}
 		float readVoltage() {
-			// Always DEFAULT (~5V) reference assumed by platform
-			(uint16_t)analogRead(_adcPin); // dummy
+			// Direct battery connection on A0 (no divider). The ADC sees the cell voltage
+			// directly, so convert the raw reading to volts using the ADC reference.
+			(void)analogRead(_adcPin); // discard first sample
 			uint16_t raw = analogRead(_adcPin);
-			return (float)_vrefMv * (float)raw / 1023.0f / 1000.0f;
+			return ((float)_vrefMv * (float)raw) / 1023.0f / 1000.0f;
 		}
 		bool isCharging() const {
 			if (_chrgPin == 0xFF) return false;

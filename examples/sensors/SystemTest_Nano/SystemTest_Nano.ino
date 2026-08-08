@@ -48,7 +48,7 @@
  *              S  stop            +  speed +20       -  speed -20
  *   Buzzer:    z  short beep      h  car horn        r  R2D2            e  siren
  *              x  buzzer stop / cancel IR-test mode
- *   Sensors:   i  side IR         l  LDR
+ *   Sensors:   i  side IR         l  LDR             s Sonar (measure & print)
  *   IR test:   j  wait for ONE IR command (decode + raw dump), then return to
  *                 default. 'x' cancels IR-test mode. Buzzer is unavailable
  *                 while IR-test is active (Timer2 conflict).
@@ -67,6 +67,7 @@
 #include <SideIrSensors.h>
 #include <LdrSensor.h>
 #include <Bluetooth.h>
+#include <Sonar.h>
 #include <Adafruit_NeoPixel.h>
 
  // --- IR receive (Arduino-IRremote) ------------------------------------------
@@ -83,6 +84,7 @@ MotorDriver    motors;                 // DRV8833, right D5/D6, left D9/D10
 Bluetooth      bluetooth;              // NeoSWSerial D2/D3 (external PCINT)
 SideIrSensors  sideIr;                 // A6/A7, power D4
 LdrSensor      ldr(BYBYTE_LDR_ADC_PIN, true);
+Sonar          sonar;                   // default pins from ByByteConfig
 
 Adafruit_NeoPixel strip(BYBYTE_WS2812_COUNT, BYBYTE_WS2812_PIN, NEO_GRB + NEO_KHZ800);
 
@@ -90,6 +92,7 @@ Adafruit_NeoPixel strip(BYBYTE_WS2812_COUNT, BYBYTE_WS2812_PIN, NEO_GRB + NEO_KH
 static int16_t  g_speed = 100;       // current motor speed (1..BYBYTE_MAX_PWM)
 static bool     g_headlights = false;   // WS2812 headlight state
 static bool     g_irReceive = false;    // IR receive-test mode (Timer2 owned by IRremote)
+static bool     g_sonarMeasure = false; // sonar measurement mode
 
 static const int16_t SPEED_STEP = 20;
 
@@ -98,7 +101,7 @@ static void printHelp() {
 	Serial.println(F("=== ByByteNano Peripheral Test ==="));
 	Serial.println(F("Motors: F/B/L/R move, S stop, +/- speed"));
 	Serial.println(F("Buzzer: z beep, h horn, r R2D2, e siren, x stop"));
-	Serial.println(F("Sensors: i sideIR, l LDR"));
+	Serial.println(F("Sensors: i sideIR, l LDR, s sonar"));
 	Serial.println(F("IR test: j wait for one IR cmd (raw+decode), x cancels"));
 	Serial.println(F("         (buzzer unavailable while IR-test active)"));
 	Serial.println(F("LEDs: w headlights toggle, o off"));
@@ -151,6 +154,34 @@ static void cmdLdr() {
 	uint16_t norm = ldr.readNormalized(); // 0..1000 (1000 = dark with invert)
 	Serial.print(F("LDR raw=")); Serial.print(raw);
 	Serial.print(F(" norm=")); Serial.println(norm);
+}
+
+static void cmdSonarMeasure() {
+	if (g_sonarMeasure) {
+		Serial.println(F("Sonar mode already active (x to cancel)"));
+		return;
+	}
+	sonar.begin();
+	g_sonarMeasure = true;
+	Serial.println(F("Sonar mode ON"));
+	Serial.println(F("Send 'x' to return to main menu"));
+}
+
+static void exitSonarMeasure() {
+	sonar.end();
+	g_sonarMeasure = false;
+	Serial.println(F("Sonar mode OFF"));
+	printHelp();
+}
+
+static void handleSonarMeasure() {
+	uint16_t distance = sonar.readCm();
+	if (distance == 0) {
+		Serial.println(F("Sonar: no echo"));
+	} else {
+		Serial.print(F("Sonar: ")); Serial.print(distance); Serial.println(F(" cm"));
+	}
+	delay(150);
 }
 
 // --- IR receive-test mode ----------------------------------------------------
@@ -240,6 +271,15 @@ static void cmdBluetooth() {
 
 // --- Dispatch ----------------------------------------------------------------
 static void handleCmd(char c) {
+	if (g_sonarMeasure) {
+		if (c == 'x') {
+			exitSonarMeasure();
+		} else {
+			Serial.println(F("Sonar mode active: send 'x' to return to menu"));
+		}
+		return;
+	}
+
 	// While IR-test is active, only 'x' (cancel) is honored; everything else
 	// that would touch Timer2 (buzzer) is refused. Motors/LEDs/sensors are
 	// still allowed because they do not touch Timer2.
@@ -252,15 +292,16 @@ static void handleCmd(char c) {
 	switch (c) {
 	case 'F': case 'B': case 'L': case 'R': case 'S': cmdMotors(c); break;
 	case '+': case '-':                               cmdSpeed(c);  break;
-	case 'z': case 'h': case 'r': case 'e':          cmdBuzzer(c); break;
+	case 'z': case 'h': case 'r': case 'e':           cmdBuzzer(c); break;
 	case 'x':
 		if (g_irReceive) exitIrReceive();
 		else             cmdBuzzer('x');
 		break;
 	case 'i': cmdSideIr();   break;
 	case 'l': cmdLdr();       break;
+	case 's': cmdSonarMeasure(); break;
 	case 'j': cmdIrReceive(); break;
-	case 'w': case 'o':       cmdLeds(c);    break;
+	case 'w': cmdLeds(c);    break;
 	case 't': cmdBluetooth(); break;
 	case '?': printHelp();    break;
 	case '\r': case '\n': break; // ignore line endings
@@ -272,7 +313,7 @@ static void handleCmd(char c) {
 }
 
 void setup() {
-	Serial.begin(115200);
+	Serial.begin(9600);
 	while (!Serial) {}
 
 	if (!motors.begin()) Serial.println(F("WARN: motor begin failed"));
@@ -296,8 +337,9 @@ void loop() {
 		handleCmd(c);
 	}
 
-	// IR-test mode: poll for one frame, then leave the mode.
-	if (g_irReceive) {
+	if (g_sonarMeasure) {
+		handleSonarMeasure();
+	} else if (g_irReceive) {
 		if (IrReceiver.decode()) {
 			handleIrFrame();
 			IrReceiver.resume();        // ready for next (in case 'j' is sent again)

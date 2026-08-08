@@ -14,17 +14,16 @@
  *   since ByByteServo provides the same <Servo.h> header (class ByByte::Servo).
  */
 #include <ByByteLib.h>
+#include <Servo.h>
 
-using namespace ByByte;
-
-Servo sc;
+ByByte::Servo sc;
 
 // Tune these for your servo's stop point and deadband
 static const uint16_t STOP_US = 1320;
 static const uint16_t DEADBAND_US = 20;
 
 void setup() {
-	Serial.begin(115200);
+	Serial.begin(9600);
 	if (!sc.attach(BYBYTE_SERVO0_PIN)) {
 		Serial.println(F("Failed to attach continuous servo"));
 	}

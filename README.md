@@ -20,8 +20,7 @@ Full public-API reference lives under [`docs/`](docs/README.md). Quick links:
 | `ByByte::LdrSensor` | [docs/api/ldr-sensor.md](docs/api/ldr-sensor.md) | LDR light sensor with auto-calibration and normalized output. |
 | `ByByte::Lm35Sensor` | [docs/api/lm35-sensor.md](docs/api/lm35-sensor.md) | Analog temperature sensor returning °C / °F. |
 | `ByByte::BatterySensor` | [docs/api/battery-sensor.md](docs/api/battery-sensor.md) | Battery voltage / charging status / SoC (**Mega**; stub on Nano). |
-| `ByByte::Sonar` | [docs/api/sonar.md](docs/api/sonar.md) | Non-blocking HC-SR04-style ultrasonic rangefinder. |
-| `ByByte::SonarPrecise` | [docs/api/sonar-precise.md](docs/api/sonar-precise.md) | High-precision multi-instance sonar (up to 4, 1µs timer, median filter). |
+| `ByByte::Sonar` | [docs/api/sonar.md](docs/api/sonar.md) | Non-blocking HC-SR04-style ultrasonic rangefinder (current sonar API). |
 | `ByByte::Buzzer` | [docs/api/buzzer.md](docs/api/buzzer.md) | Non-blocking tone / pattern buzzer (built-in sequences in flash). |
 | `ByByte::Servo` | [docs/api/servo.md](docs/api/servo.md) | Hobby servo: angle / µs / continuous-rotation speed (**Mega**; no-op on Nano). |
 | `ByByte::Bluetooth` | [docs/api/bluetooth.md](docs/api/bluetooth.md) | HC-02/05/06/08/42 bridge: AT commands + Stream API (Mega UART+power; Nano SoftwareSerial). |
@@ -60,7 +59,7 @@ See the examples in the `examples/` directory:
 - `examples/motors/` — `Simple`, `Direct`, `Tank` motor sketches
 - `examples/bluetooth/` — `CarControl`, `Passtrough` Bluetooth sketches
 - `examples/sensors/` — `BatteryLcd_Mega`, `LightAutoLamp`, `MPU6050_Mega`,
-  `SideIrSensors`, `SonarPrecise`, `SystemTest_Mega`, `TempLcd_Mega`
+  `SideIrSensors`, `Sonar`, `SystemTest_Mega`, `TempLcd_Mega`
 - `examples/buzzer/` — `AllFeatures`
 - `examples/ir/` — `Receiver`
 - `examples/line/` — `LineFollow_Mega`, `LineFollow_Nano`
