@@ -1,6 +1,6 @@
 {
   "name": "ByByteLib",
-  "version": "0.2.0",
+  "version": "1.0.0-alpha",
   "description": "Cross-platform robotics control library for Arduino-compatible boards: motors (DRV8833/TB6612), buzzer, sensors, Bluetooth, IR, servo, sonar.",
   "keywords": ["robotics", "motor", "kinematics", "sensors", "bluetooth", "arduino"],
   "authors": [
